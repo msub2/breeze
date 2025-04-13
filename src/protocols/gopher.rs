@@ -2,7 +2,7 @@ use std::cell::Cell;
 
 use eframe::egui::{self, Color32, Label, RichText, TextEdit, Ui};
 
-use crate::{networking::is_hostname_valid, Breeze};
+use crate::Breeze;
 
 use super::{Protocol, ProtocolHandler};
 
@@ -192,7 +192,10 @@ impl ProtocolHandler for Gopher {
                         } else {
                             "".to_string()
                         };
-                        let url = format!("gopher://{}{}{}?{}", line.hostname, port, line.selector, &current_search);
+                        let url = format!(
+                            "gopher://{}{}{}?{}",
+                            line.hostname, port, line.selector, &current_search
+                        );
                         breeze.url.set(url.clone());
                         breeze.navigation_hint.set(Some((url, Protocol::Gopher)));
                     }

@@ -31,7 +31,7 @@ pub fn add_entry(url: Url, protocol: Protocol) {
     // Only add if different from current
     if history.last().is_none_or(|e| e.url != url) {
         history.push(HistoryEntry::new(url, protocol));
-        *index = history.len() - 1;  // Point to the newly added URL
+        *index = history.len() - 1; // Point to the newly added URL
     }
 }
 

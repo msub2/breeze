@@ -13,6 +13,7 @@ use history::{add_entry, can_go_back, can_go_forward};
 use networking::fetch;
 use url::Url;
 
+use crate::protocols::finger::Finger;
 use crate::protocols::gopher::Gopher;
 use crate::protocols::{Protocol, ProtocolHandler};
 use crate::uri::get_protocol;
@@ -38,6 +39,7 @@ fn main() -> eframe::Result {
 
 #[derive(Default)]
 struct ProtocolHandlers {
+    finger: Finger,
     gopher: Gopher,
 }
 
@@ -79,11 +81,40 @@ impl Breeze {
             return;
         }
         match get_protocol(&self.current_url.scheme()) {
+            Protocol::Finger => {
+                let mut selector = self.current_url.path();
+                if selector.starts_with("/") {
+                    selector = &selector[1..];
+                }
+                let response = fetch(
+                    self.current_url.host_str().unwrap(),
+                    self.current_url.port().unwrap_or(79),
+                    selector,
+                );
+                match response {
+                    Ok(response) => {
+                        self.page_content = response;
+                        self.protocol_handlers
+                            .finger
+                            .parse_content(&self.page_content, true);
+                    }
+                    Err(error) => {
+                        self.page_content = error;
+                        self.protocol_handlers
+                            .finger
+                            .parse_content(&self.page_content, true);
+                    }
+                }
+            }
             Protocol::Gopher => {
                 let response = fetch(
                     self.current_url.host_str().unwrap(),
                     self.current_url.port().unwrap_or(70),
-                    &format!("{}\t{}", self.current_url.path(), self.current_url.query().unwrap_or("")),
+                    &format!(
+                        "{}\t{}",
+                        self.current_url.path(),
+                        self.current_url.query().unwrap_or("")
+                    ),
                 );
                 match response {
                     Ok(response) => {
@@ -92,11 +123,13 @@ impl Breeze {
                         self.protocol_handlers
                             .gopher
                             .parse_content(&self.page_content, plaintext);
-                    },
+                    }
                     Err(error) => {
                         self.page_content = error;
-                        self.protocol_handlers.gopher.parse_content(&self.page_content, true);
-                    },
+                        self.protocol_handlers
+                            .gopher
+                            .parse_content(&self.page_content, true);
+                    }
                 }
             }
             _ => unreachable!(),
@@ -109,13 +142,19 @@ impl eframe::App for Breeze {
         egui::CentralPanel::default().show(ctx, |ui| {
             // Navigation and address bar
             ui.horizontal(|ui| {
-                if ui.add_enabled(can_go_back(), egui::Button::new("Back")).clicked() {
+                if ui
+                    .add_enabled(can_go_back(), egui::Button::new("Back"))
+                    .clicked()
+                {
                     if let Some(entry) = history::back() {
                         self.url.set(entry.url.to_string());
                         self.navigate(Some(entry.protocol), false);
                     }
                 }
-                if ui.add_enabled(can_go_forward(), egui::Button::new("Forward")).clicked() {
+                if ui
+                    .add_enabled(can_go_forward(), egui::Button::new("Forward"))
+                    .clicked()
+                {
                     if let Some(entry) = history::forward() {
                         self.url.set(entry.url.to_string());
                         self.navigate(Some(entry.protocol), false);
@@ -138,8 +177,17 @@ impl eframe::App for Breeze {
                 self.reset_scroll_pos = false;
             }
             scroll_area.show(ui, |ui| match get_protocol(&self.current_url.scheme()) {
+                Protocol::Finger => {
+                    self.protocol_handlers.finger.render_page(ui, self);
+                }
+                Protocol::Gemini => {
+                    todo!()
+                }
                 Protocol::Gopher => {
                     self.protocol_handlers.gopher.render_page(ui, self);
+                }
+                Protocol::Scorpion => {
+                    todo!()
                 }
                 Protocol::Plaintext | Protocol::Unknown => {
                     let _ = ui.monospace(&self.page_content);

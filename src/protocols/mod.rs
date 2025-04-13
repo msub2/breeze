@@ -1,11 +1,15 @@
+pub mod finger;
 pub mod gopher;
 
 use eframe::egui;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Protocol {
-    Plaintext,
+    Finger,
     Gopher,
+    Gemini,
+    Plaintext,
+    Scorpion,
     Unknown,
 }
 
