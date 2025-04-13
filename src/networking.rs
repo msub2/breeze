@@ -3,9 +3,11 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::{LazyLock, Mutex};
 
+#[allow(dead_code)]
 static DNS_CACHE: LazyLock<Mutex<HashMap<String, Vec<SocketAddr>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+#[allow(dead_code)]
 pub fn is_hostname_valid(hostname: &str) -> bool {
     let mut cache = DNS_CACHE.lock().expect("Failed to lock DNS cache");
     if cache.contains_key(hostname) {
@@ -31,13 +33,11 @@ pub fn fetch(hostname: &str, port: u16, selector: &str) -> Result<String, String
     let mut buf = String::new();
 
     if let Ok(mut stream) = TcpStream::connect(url) {
-        stream.write(request.as_bytes()).unwrap();
-        stream.read_to_string(&mut buf).unwrap();
+        stream.write_all(request.as_bytes()).map_err(|e| e.to_string())?;
+        stream.read_to_string(&mut buf).map_err(|e| e.to_string())?;
         Ok(buf)
     } else {
         buf.push_str(&format!("Failed to connect to hostname: {}", hostname));
-        return Err(buf);
+        Err(buf)
     }
-
-    // println!("{}", buf);
 }

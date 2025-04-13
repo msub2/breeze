@@ -7,6 +7,7 @@ use crate::Breeze;
 use super::{Protocol, ProtocolHandler};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 enum LineType {
     Text,
     Submenu,
@@ -142,16 +143,9 @@ impl GopherLine {
     }
 }
 
+#[derive(Default)]
 pub struct Gopher {
     current_page_contents: Vec<GopherLine>,
-}
-
-impl Default for Gopher {
-    fn default() -> Self {
-        Self {
-            current_page_contents: Vec::new(),
-        }
-    }
 }
 
 impl ProtocolHandler for Gopher {

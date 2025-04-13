@@ -71,16 +71,16 @@ impl Breeze {
     // Validate URL before updating the currently active page content
     fn navigate(&mut self, protocol_hint: Option<Protocol>, should_add_entry: bool) {
         if should_add_entry {
-            let protocol = protocol_hint.unwrap_or(get_protocol(&self.current_url.scheme()));
-            add_entry(Url::from_str(&self.url.get_mut()).unwrap(), protocol);
+            let protocol = protocol_hint.unwrap_or(get_protocol(self.current_url.scheme()));
+            add_entry(Url::from_str(self.url.get_mut()).unwrap(), protocol);
         }
-        self.current_url = Url::from_str(&self.url.get_mut()).unwrap();
-        let protocol = get_protocol(&self.current_url.scheme());
+        self.current_url = Url::from_str(self.url.get_mut()).unwrap();
+        let protocol = get_protocol(self.current_url.scheme());
         if protocol == Protocol::Unknown {
             self.page_content = "Invalid URL".to_string();
             return;
         }
-        match get_protocol(&self.current_url.scheme()) {
+        match protocol {
             Protocol::Finger => {
                 let mut selector = self.current_url.path();
                 if selector.starts_with("/") {
@@ -176,7 +176,7 @@ impl eframe::App for Breeze {
                 scroll_area = scroll_area.scroll_offset([0.0, 0.0].into());
                 self.reset_scroll_pos = false;
             }
-            scroll_area.show(ui, |ui| match get_protocol(&self.current_url.scheme()) {
+            scroll_area.show(ui, |ui| match get_protocol(self.current_url.scheme()) {
                 Protocol::Finger => {
                     self.protocol_handlers.finger.render_page(ui, self);
                 }

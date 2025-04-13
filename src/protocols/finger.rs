@@ -1,13 +1,15 @@
-use eframe::egui::{self, Color32, Label, RichText, Ui};
+use eframe::egui::Ui;
 
 use crate::Breeze;
 
-use super::{Protocol, ProtocolHandler};
+use super::ProtocolHandler;
 
 pub struct Finger {
     current_page_contents: String,
 }
 
+// Ignoring this clippy warning for now in case I decide to add link support
+#[allow(clippy::derivable_impls)]
 impl Default for Finger {
     fn default() -> Self {
         Self {
