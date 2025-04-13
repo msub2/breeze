@@ -25,16 +25,19 @@ pub fn is_hostname_valid(hostname: &str) -> bool {
     }
 }
 
-pub fn fetch(hostname: &str, port: u16, selector: &str) -> String {
+pub fn fetch(hostname: &str, port: u16, selector: &str) -> Result<String, String> {
     let url = format!("{}:{}", hostname, port);
     let request = format!("{}\r\n", selector);
-
-    let mut stream = TcpStream::connect(url).unwrap();
-    stream.write(request.as_bytes()).unwrap();
     let mut buf = String::new();
-    stream.read_to_string(&mut buf).unwrap();
+
+    if let Ok(mut stream) = TcpStream::connect(url) {
+        stream.write(request.as_bytes()).unwrap();
+        stream.read_to_string(&mut buf).unwrap();
+        Ok(buf)
+    } else {
+        buf.push_str(&format!("Failed to connect to hostname: {}", hostname));
+        return Err(buf);
+    }
 
     // println!("{}", buf);
-
-    buf
 }

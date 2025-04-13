@@ -83,14 +83,21 @@ impl Breeze {
                 let response = fetch(
                     self.current_url.host_str().unwrap(),
                     self.current_url.port().unwrap_or(70),
-                    self.current_url.path(),
+                    &format!("{}\t{}", self.current_url.path(), self.current_url.query().unwrap_or("")),
                 );
-                self.page_content = response;
-                let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext);
-                println!("Plaintext: {}", plaintext);
-                self.protocol_handlers
-                    .gopher
-                    .parse_content(&self.page_content, plaintext);
+                match response {
+                    Ok(response) => {
+                        self.page_content = response;
+                        let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext);
+                        self.protocol_handlers
+                            .gopher
+                            .parse_content(&self.page_content, plaintext);
+                    },
+                    Err(error) => {
+                        self.page_content = error;
+                        self.protocol_handlers.gopher.parse_content(&self.page_content, true);
+                    },
+                }
             }
             _ => unreachable!(),
         }

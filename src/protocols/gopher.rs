@@ -1,4 +1,6 @@
-use eframe::egui::{self, Color32, Label, RichText, Ui};
+use std::cell::Cell;
+
+use eframe::egui::{self, Color32, Label, RichText, TextEdit, Ui};
 
 use crate::{networking::is_hostname_valid, Breeze};
 
@@ -80,7 +82,6 @@ impl LineType {
     }
 }
 
-#[derive(Clone, Debug)]
 struct GopherLine {
     line_type: LineType,
     user_display_string: String,
@@ -88,6 +89,7 @@ struct GopherLine {
     hostname: String,
     port: u16,
     is_link: bool,
+    search_string: Cell<String>,
 }
 
 impl GopherLine {
@@ -101,6 +103,7 @@ impl GopherLine {
                 hostname: "".to_string(),
                 port: 0,
                 is_link: false,
+                search_string: Cell::new("".to_string()),
             };
         }
         let (line_type, content) = match s.split_at_checked(1) {
@@ -117,6 +120,7 @@ impl GopherLine {
                 hostname: "".to_string(),
                 port: 0,
                 is_link: false,
+                search_string: Cell::new("".to_string()),
             };
         }
 
@@ -124,7 +128,7 @@ impl GopherLine {
         let selector = components[1].to_string();
         let hostname = components[2].to_string();
         let port = components[3].parse().expect("Invalid port number!");
-        let is_link = is_hostname_valid(&format!("{}:{}", hostname, port));
+        let is_link = !matches!(line_type, "i" | "7");
 
         Self {
             line_type: LineType::from_str(line_type),
@@ -133,6 +137,7 @@ impl GopherLine {
             hostname,
             port,
             is_link,
+            search_string: Cell::new("".to_string()),
         }
     }
 }
@@ -177,7 +182,21 @@ impl ProtocolHandler for Gopher {
                     [16.0, 16.0],
                     Label::new(RichText::new(line.line_type.icon()).monospace()),
                 );
-                if line.is_link {
+                if line.line_type == LineType::Search {
+                    let mut current_search = line.search_string.take();
+                    ui.add(TextEdit::singleline(&mut current_search).hint_text("Search"));
+                    line.search_string.replace(current_search.clone());
+                    if ui.button("Search").clicked() {
+                        let port = if line.port != 70 {
+                            format!(":{}", line.port)
+                        } else {
+                            "".to_string()
+                        };
+                        let url = format!("gopher://{}{}{}?{}", line.hostname, port, line.selector, &current_search);
+                        breeze.url.set(url.clone());
+                        breeze.navigation_hint.set(Some((url, Protocol::Gopher)));
+                    }
+                } else if line.is_link {
                     let link_text = RichText::new(&line.user_display_string)
                         .color(Color32::BLUE)
                         .underline()
