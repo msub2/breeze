@@ -50,7 +50,7 @@ impl GeminiLine {
     fn from_str(s: &str, plaintext: bool, gemini: &mut Gemini) -> Self {
         let components = s.split_ascii_whitespace().collect::<Vec<&str>>();
 
-        if plaintext || components.len() == 0 {
+        if plaintext || components.is_empty() {
             // Treat every line as an informational one
             return Self {
                 line_type: LineType::Text,
@@ -186,9 +186,6 @@ impl ProtocolHandler for Gemini {
                             ui.label(format!("• {}", line.content));
                         }
                         LineType::PreformatToggle => {},
-                        _ => {
-                            println!("Unhandled line type: {:?}", line.line_type);
-                        },
                     }
                 }
             });

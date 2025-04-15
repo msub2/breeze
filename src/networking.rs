@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex};
 
 use native_tls::TlsConnector;
 
@@ -48,16 +48,14 @@ pub fn fetch(hostname: &str, port: u16, selector: &str, ssl: bool) -> Result<Str
             .map_err(|e| e.to_string())?;
         stream.read_to_string(&mut buf).map_err(|e| e.to_string())?;
         Ok(buf)
+    } else if let Ok(mut stream) = TcpStream::connect(url) {
+        stream
+            .write_all(request.as_bytes())
+            .map_err(|e| e.to_string())?;
+        stream.read_to_string(&mut buf).map_err(|e| e.to_string())?;
+        Ok(buf)
     } else {
-        if let Ok(mut stream) = TcpStream::connect(url) {
-            stream
-                .write_all(request.as_bytes())
-                .map_err(|e| e.to_string())?;
-            stream.read_to_string(&mut buf).map_err(|e| e.to_string())?;
-            Ok(buf)
-        } else {
-            buf.push_str(&format!("Failed to connect to hostname: {}", hostname));
-            Err(buf)
-        }
+        buf.push_str(&format!("Failed to connect to hostname: {}", hostname));
+        Err(buf)
     }
 }

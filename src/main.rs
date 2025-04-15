@@ -118,7 +118,7 @@ impl Breeze {
                 let response = fetch(
                     self.current_url.host_str().unwrap(),
                     self.current_url.port().unwrap_or(1965),
-                    &self.current_url.to_string(),
+                    self.current_url.as_str(),
                     true,
                 );
                 match response {

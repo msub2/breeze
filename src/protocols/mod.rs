@@ -7,6 +7,7 @@ pub mod textprotocol;
 use eframe::egui;
 use url::Url;
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Protocol {
     Finger,
