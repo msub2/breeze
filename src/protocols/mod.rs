@@ -1,16 +1,32 @@
 pub mod finger;
 pub mod gopher;
+pub mod nex;
 
 use eframe::egui;
+use url::Url;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Protocol {
     Finger,
     Gopher,
     Gemini,
+    Nex,
     Plaintext,
     Scorpion,
     Unknown,
+}
+
+impl Protocol {
+    pub fn from_url(url: &Url) -> Protocol {
+        match url.scheme() {
+            "finger" => Protocol::Finger,
+            "gemini" => Protocol::Gemini,
+            "gopher" => Protocol::Gopher,
+            "nex" => Protocol::Nex,
+            "scorpion" => Protocol::Scorpion,
+            _ => Protocol::Unknown,
+        }
+    }
 }
 
 pub trait ProtocolHandler {

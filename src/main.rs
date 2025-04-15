@@ -3,7 +3,6 @@
 mod history;
 mod networking;
 mod protocols;
-mod uri;
 
 use std::cell::Cell;
 use std::str::FromStr;
@@ -15,8 +14,8 @@ use url::Url;
 
 use crate::protocols::finger::Finger;
 use crate::protocols::gopher::Gopher;
+use crate::protocols::nex::Nex;
 use crate::protocols::{Protocol, ProtocolHandler};
-use crate::uri::get_protocol;
 
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -41,6 +40,7 @@ fn main() -> eframe::Result {
 struct ProtocolHandlers {
     finger: Finger,
     gopher: Gopher,
+    nex: Nex,
 }
 
 struct Breeze {
@@ -57,13 +57,13 @@ struct Breeze {
 
 impl Breeze {
     fn new() -> Self {
-        let starting_url = "gopher://gopher.floodgap.com".to_string();
+        let starting_url = Url::from_str("gopher://gopher.floodgap.com").unwrap();
         Self {
-            url: Cell::new(starting_url.clone()),
-            current_url: Url::from_str(&starting_url).unwrap(),
+            url: Cell::new(starting_url.to_string()),
+            current_url: starting_url.clone(),
             page_content: "".to_string(),
             protocol_handlers: Default::default(),
-            navigation_hint: Cell::new(Some((starting_url.clone(), get_protocol(&starting_url)))),
+            navigation_hint: Cell::new(Some((starting_url.to_string(), Protocol::from_url(&starting_url)))),
             reset_scroll_pos: false,
         }
     }
@@ -71,11 +71,11 @@ impl Breeze {
     // Validate URL before updating the currently active page content
     fn navigate(&mut self, protocol_hint: Option<Protocol>, should_add_entry: bool) {
         if should_add_entry {
-            let protocol = protocol_hint.unwrap_or(get_protocol(self.current_url.scheme()));
+            let protocol = protocol_hint.unwrap_or(Protocol::from_url(&self.current_url));
             add_entry(Url::from_str(self.url.get_mut()).unwrap(), protocol);
         }
         self.current_url = Url::from_str(self.url.get_mut()).unwrap();
-        let protocol = get_protocol(self.current_url.scheme());
+        let protocol = Protocol::from_url(&self.current_url);
         if protocol == Protocol::Unknown {
             self.page_content = "Invalid URL".to_string();
             return;
@@ -132,6 +132,27 @@ impl Breeze {
                     }
                 }
             }
+            Protocol::Nex => {
+                let response = fetch(
+                    self.current_url.host_str().unwrap(),
+                    self.current_url.port().unwrap_or(1900),
+                    self.current_url.path(),
+                );
+                match response {
+                    Ok(response) => {
+                        self.page_content = response;
+                        self.protocol_handlers
+                            .nex
+                            .parse_content(&self.page_content, self.current_url.path().ends_with(".txt"));
+                    }
+                    Err(error) => {
+                        self.page_content = error;
+                        self.protocol_handlers
+                            .nex
+                            .parse_content(&self.page_content, true);
+                    }
+                }
+            }
             _ => unreachable!(),
         }
     }
@@ -176,7 +197,7 @@ impl eframe::App for Breeze {
                 scroll_area = scroll_area.scroll_offset([0.0, 0.0].into());
                 self.reset_scroll_pos = false;
             }
-            scroll_area.show(ui, |ui| match get_protocol(self.current_url.scheme()) {
+            scroll_area.show(ui, |ui| match Protocol::from_url(&self.current_url) {
                 Protocol::Finger => {
                     self.protocol_handlers.finger.render_page(ui, self);
                 }
@@ -185,6 +206,9 @@ impl eframe::App for Breeze {
                 }
                 Protocol::Gopher => {
                     self.protocol_handlers.gopher.render_page(ui, self);
+                }
+                Protocol::Nex => {
+                    self.protocol_handlers.nex.render_page(ui, self);
                 }
                 Protocol::Scorpion => {
                     todo!()
