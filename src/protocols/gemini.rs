@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use eframe::egui::{self, Color32, Label, RichText, TextEdit, Ui};
+use eframe::egui::{self, Color32, Label, RichText, TextEdit, Ui, Vec2};
 use env_logger::fmt::style::Color;
 
 use crate::Breeze;
@@ -57,7 +57,7 @@ impl GeminiLine {
                 line_type: LineType::Text,
                 content: s.to_string(),
                 path: None,
-                preformatted: false,
+                preformatted: gemini.preformat_line,
             };
         }
 
@@ -123,11 +123,15 @@ impl ProtocolHandler for Gemini {
     }
 
     fn render_page(&self, ui: &mut Ui, breeze: &Breeze) {
+        ui.style_mut().spacing.item_spacing = Vec2::new(0.0, -2.0);
         for line in &self.current_page_contents {
             ui.horizontal(|ui| {
-                if line.preformatted {
-                    let text = RichText::new(&line.content).background_color(Color32::LIGHT_GRAY).monospace();
-                    ui.add(egui::Label::new(text));
+                if line.preformatted && line.line_type != LineType::PreformatToggle {
+                    let mut padded_text = line.content.clone();
+                    let padding_needed = 80_usize.saturating_sub(padded_text.len());
+                    padded_text.push_str(&" ".repeat(padding_needed));
+                    let text = RichText::new(&padded_text).background_color(Color32::LIGHT_GRAY).monospace();
+                    ui.add_sized([80.0, 16.0], egui::Label::new(text).extend());
                 } else {
                     match line.line_type {
                         LineType::Text => {
