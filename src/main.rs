@@ -8,11 +8,12 @@ use std::cell::Cell;
 use std::str::FromStr;
 
 use eframe::egui;
-use history::{add_entry, can_go_back, can_go_forward};
-use networking::fetch;
 use url::Url;
 
+use crate::history::{add_entry, can_go_back, can_go_forward};
+use crate::networking::fetch;
 use crate::protocols::finger::Finger;
+use crate::protocols::gemini::Gemini;
 use crate::protocols::gopher::Gopher;
 use crate::protocols::nex::Nex;
 use crate::protocols::{Protocol, ProtocolHandler};
@@ -39,6 +40,7 @@ fn main() -> eframe::Result {
 #[derive(Default)]
 struct ProtocolHandlers {
     finger: Finger,
+    gemini: Gemini,
     gopher: Gopher,
     nex: Nex,
 }
@@ -57,13 +59,16 @@ struct Breeze {
 
 impl Breeze {
     fn new() -> Self {
-        let starting_url = Url::from_str("gopher://gopher.floodgap.com").unwrap();
+        let starting_url = Url::from_str("gemini://geminiprotocol.net/").unwrap();
         Self {
             url: Cell::new(starting_url.to_string()),
             current_url: starting_url.clone(),
             page_content: "".to_string(),
             protocol_handlers: Default::default(),
-            navigation_hint: Cell::new(Some((starting_url.to_string(), Protocol::from_url(&starting_url)))),
+            navigation_hint: Cell::new(Some((
+                starting_url.to_string(),
+                Protocol::from_url(&starting_url),
+            ))),
             reset_scroll_pos: false,
         }
     }
@@ -90,6 +95,7 @@ impl Breeze {
                     self.current_url.host_str().unwrap(),
                     self.current_url.port().unwrap_or(79),
                     selector,
+                    false,
                 );
                 match response {
                     Ok(response) => {
@@ -106,6 +112,29 @@ impl Breeze {
                     }
                 }
             }
+            Protocol::Gemini => {
+                let response = fetch(
+                    self.current_url.host_str().unwrap(),
+                    self.current_url.port().unwrap_or(1965),
+                    &self.current_url.to_string(),
+                    true,
+                );
+                match response {
+                    Ok(response) => {
+                        self.page_content = response;
+                        let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext);
+                        self.protocol_handlers
+                            .gemini
+                            .parse_content(&self.page_content, plaintext);
+                    }
+                    Err(error) => {
+                        self.page_content = error;
+                        self.protocol_handlers
+                            .gemini
+                            .parse_content(&self.page_content, true);
+                    }
+                }
+            }
             Protocol::Gopher => {
                 let response = fetch(
                     self.current_url.host_str().unwrap(),
@@ -115,6 +144,7 @@ impl Breeze {
                         self.current_url.path(),
                         self.current_url.query().unwrap_or("")
                     ),
+                    false,
                 );
                 match response {
                     Ok(response) => {
@@ -137,13 +167,15 @@ impl Breeze {
                     self.current_url.host_str().unwrap(),
                     self.current_url.port().unwrap_or(1900),
                     self.current_url.path(),
+                    false,
                 );
                 match response {
                     Ok(response) => {
                         self.page_content = response;
-                        self.protocol_handlers
-                            .nex
-                            .parse_content(&self.page_content, self.current_url.path().ends_with(".txt"));
+                        self.protocol_handlers.nex.parse_content(
+                            &self.page_content,
+                            self.current_url.path().ends_with(".txt"),
+                        );
                     }
                     Err(error) => {
                         self.page_content = error;
@@ -202,7 +234,7 @@ impl eframe::App for Breeze {
                     self.protocol_handlers.finger.render_page(ui, self);
                 }
                 Protocol::Gemini => {
-                    todo!()
+                    self.protocol_handlers.gemini.render_page(ui, self);
                 }
                 Protocol::Gopher => {
                     self.protocol_handlers.gopher.render_page(ui, self);

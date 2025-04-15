@@ -38,7 +38,10 @@ impl ProtocolHandler for Nex {
                 ui.horizontal(|ui| {
                     let (label, url) = line.text.split_once(' ').unwrap();
                     ui.label(label);
-                    let link_text = RichText::new(url).color(Color32::BLUE).underline().monospace();
+                    let link_text = RichText::new(url)
+                        .color(Color32::BLUE)
+                        .underline()
+                        .monospace();
                     let link = ui.add(Label::new(link_text).sense(egui::Sense::hover()));
                     if link.hovered() {
                         ui.output_mut(|o| o.cursor_icon = egui::CursorIcon::PointingHand);

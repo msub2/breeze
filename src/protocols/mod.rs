@@ -1,4 +1,5 @@
 pub mod finger;
+pub mod gemini;
 pub mod gopher;
 pub mod nex;
 
