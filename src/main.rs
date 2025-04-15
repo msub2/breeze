@@ -187,6 +187,29 @@ impl Breeze {
                     }
                 }
             }
+            Protocol::Spartan => {
+                let response = fetch(
+                    self.current_url.host_str().unwrap(),
+                    self.current_url.port().unwrap_or(300),
+                    &format!("{} {} {}", self.current_url.host_str().unwrap(), self.current_url.path(), 0),
+                    false,
+                );
+                match response {
+                    Ok(response) => {
+                        self.page_content = response;
+                        self.protocol_handlers.gemini.parse_content(
+                            &self.page_content,
+                            self.current_url.path().ends_with(".txt"),
+                        );
+                    }
+                    Err(error) => {
+                        self.page_content = error;
+                        self.protocol_handlers
+                            .gemini
+                            .parse_content(&self.page_content, true);
+                    }
+                }
+            }
             Protocol::TextProtocol => {
                 let response = fetch(
                     self.current_url.host_str().unwrap(),
@@ -269,6 +292,9 @@ impl eframe::App for Breeze {
                 }
                 Protocol::Scorpion => {
                     todo!()
+                }
+                Protocol::Spartan => {
+                    self.protocol_handlers.gemini.render_page(ui, self);
                 }
                 Protocol::TextProtocol => {
                     self.protocol_handlers.textprotocol.render_page(ui, self);

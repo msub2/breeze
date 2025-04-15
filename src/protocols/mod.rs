@@ -15,6 +15,7 @@ pub enum Protocol {
     Nex,
     Plaintext,
     Scorpion,
+    Spartan,
     TextProtocol,
     Unknown,
 }
@@ -27,6 +28,7 @@ impl Protocol {
             "gopher" => Protocol::Gopher,
             "nex" => Protocol::Nex,
             "scorpion" => Protocol::Scorpion,
+            "spartan" => Protocol::Spartan,
             "text" => Protocol::TextProtocol,
             _ => Protocol::Unknown,
         }
