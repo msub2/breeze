@@ -2,6 +2,7 @@ pub mod finger;
 pub mod gemini;
 pub mod gopher;
 pub mod nex;
+pub mod textprotocol;
 
 use eframe::egui;
 use url::Url;
@@ -14,6 +15,7 @@ pub enum Protocol {
     Nex,
     Plaintext,
     Scorpion,
+    TextProtocol,
     Unknown,
 }
 
@@ -25,6 +27,7 @@ impl Protocol {
             "gopher" => Protocol::Gopher,
             "nex" => Protocol::Nex,
             "scorpion" => Protocol::Scorpion,
+            "text" => Protocol::TextProtocol,
             _ => Protocol::Unknown,
         }
     }

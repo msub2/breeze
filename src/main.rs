@@ -8,6 +8,7 @@ use std::cell::Cell;
 use std::str::FromStr;
 
 use eframe::egui;
+use protocols::textprotocol::TextProtocol;
 use url::Url;
 
 use crate::history::{add_entry, can_go_back, can_go_forward};
@@ -43,6 +44,7 @@ struct ProtocolHandlers {
     gemini: Gemini,
     gopher: Gopher,
     nex: Nex,
+    textprotocol: TextProtocol,
 }
 
 struct Breeze {
@@ -185,6 +187,29 @@ impl Breeze {
                     }
                 }
             }
+            Protocol::TextProtocol => {
+                let response = fetch(
+                    self.current_url.host_str().unwrap(),
+                    self.current_url.port().unwrap_or(1961),
+                    self.current_url.as_str(),
+                    false,
+                );
+                match response {
+                    Ok(response) => {
+                        self.page_content = response;
+                        self.protocol_handlers.textprotocol.parse_content(
+                            &self.page_content,
+                            self.current_url.path().ends_with(".txt"),
+                        );
+                    }
+                    Err(error) => {
+                        self.page_content = error;
+                        self.protocol_handlers
+                            .textprotocol
+                            .parse_content(&self.page_content, true);
+                    }
+                }
+            }
             _ => unreachable!(),
         }
     }
@@ -244,6 +269,9 @@ impl eframe::App for Breeze {
                 }
                 Protocol::Scorpion => {
                     todo!()
+                }
+                Protocol::TextProtocol => {
+                    self.protocol_handlers.textprotocol.render_page(ui, self);
                 }
                 Protocol::Plaintext | Protocol::Unknown => {
                     let _ = ui.monospace(&self.page_content);
