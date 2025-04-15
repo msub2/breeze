@@ -1,7 +1,4 @@
-use std::cell::Cell;
-
-use eframe::egui::{self, Color32, Label, RichText, TextEdit, Ui, Vec2};
-use env_logger::fmt::style::Color;
+use eframe::egui::{self, Color32, Label, RichText, Ui, Vec2};
 
 use crate::Breeze;
 
@@ -30,10 +27,12 @@ impl LineType {
             LineType::Heading2
         } else if s.starts_with("#") {
             LineType::Heading1
-        } else if s.starts_with("> ") {
+        } else if s.starts_with(">") {
             LineType::Quote
         } else if s.starts_with("```") {
             LineType::PreformatToggle
+        } else if s.starts_with("*") {
+            LineType::List
         } else {
             LineType::Text
         }
@@ -66,25 +65,30 @@ impl GeminiLine {
             gemini.preformat_line = !gemini.preformat_line;
         }
         let (content, path) = if gemini.preformat_line && line_type != LineType::PreformatToggle {
-            (&s.to_string(), None)
+            (s.to_string(), None)
         } else {
             match line_type {
                 LineType::Link => {
-                    (&components[2..].join(" ").to_string(), Some(components[1].to_string()))
+                    let content = if components.len() == 2 {
+                        components[1].to_string()
+                    } else {
+                        components[2..].join(" ").to_string()
+                    };
+                    (content, Some(components[1].to_string()))
                 },
                 LineType::Text => {
-                    (&s.to_string(), None)
+                    (s.to_string(), None)
                 }
-                LineType::PreformatToggle => (&"".to_string(), None),
+                LineType::PreformatToggle => ("".to_string(), None),
                 _ => {
-                    (&components[1..].join(" ").to_string(), None)
+                    (components[1..].join(" ").to_string(), None)
                 }
             }
         };
 
         Self {
             line_type,
-            content: content.to_string(),
+            content,
             path,
             preformatted: gemini.preformat_line,
         }
@@ -170,6 +174,16 @@ impl ProtocolHandler for Gemini {
                                 };
                                 breeze.navigation_hint.set(Some((current_url.to_string(), hint)));
                             }
+                        }
+                        LineType::Quote => {
+                            ui.horizontal(|ui| {
+                                ui.label("| ");
+                                let text = RichText::new(&line.content).italics();
+                                ui.add(egui::Label::new(text));
+                            });
+                        }
+                        LineType::List => {
+                            ui.label(format!("• {}", line.content));
                         }
                         LineType::PreformatToggle => {},
                         _ => {

@@ -61,7 +61,7 @@ struct Breeze {
 
 impl Breeze {
     fn new() -> Self {
-        let starting_url = Url::from_str("gemini://geminiprotocol.net/docs/cheatsheet.gmi").unwrap();
+        let starting_url = Url::from_str("spartan://mozz.us/test.gmi").unwrap();
         Self {
             url: Cell::new(starting_url.to_string()),
             current_url: starting_url.clone(),
