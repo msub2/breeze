@@ -8,7 +8,7 @@ use std::cell::Cell;
 use std::str::FromStr;
 
 use egui::{FontData, FontDefinitions, FontFamily};
-use eframe::egui;
+use eframe::egui::{self};
 use url::Url;
 
 use crate::history::{add_entry, can_go_back, can_go_forward};
@@ -27,7 +27,9 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
 
+    // Set up custom fonts needed for rendering
     let mut fonts = FontDefinitions::default();
+    // Inconsolata for uniform monospace font
     fonts.font_data.insert(
         "Inconsolata".to_owned(),
         std::sync::Arc::new(
@@ -36,6 +38,14 @@ fn main() -> eframe::Result {
     );
     fonts.families.get_mut(&FontFamily::Monospace).unwrap()
         .insert(0, "Inconsolata".to_owned());
+    // Segoe UI Symbols for rendering extended Unicode chars
+    fonts.font_data.insert(
+        "SegoeUISymbol".to_owned(),
+        std::sync::Arc::new(
+            FontData::from_static(include_bytes!("../res/segoe-ui-symbol.ttf"))
+        )
+    );
+    fonts.families.get_mut(&FontFamily::Monospace).unwrap().push("SegoeUISymbol".to_string());
 
     eframe::run_native(
         "Breeze",
@@ -102,6 +112,7 @@ impl Breeze {
     // Validate URL before updating the currently active page content
     fn navigate(&mut self, protocol_hint: Option<Protocol>, should_add_entry: bool) {
         if should_add_entry {
+            println!("{}", self.url.get_mut());
             let protocol = protocol_hint.unwrap_or(Protocol::from_url(&self.current_url));
             add_entry(Url::from_str(self.url.get_mut()).unwrap(), protocol);
         }
@@ -205,6 +216,9 @@ impl eframe::App for Breeze {
             scroll_area.show(ui, |ui| {
                 let protocol = Protocol::from_url(&self.current_url);
                 match protocol {
+                    Protocol::Finger => {
+                        self.content_handlers.finger.render_page(ui, self);
+                    }
                     Protocol::Gemini | Protocol::Spartan => {
                         self.content_handlers.gemtext.render_page(ui, self);
                     }

@@ -122,7 +122,7 @@ impl ProtocolHandler for Gemini {
     }
 
     fn render_page(&self, ui: &mut Ui, breeze: &Breeze) {
-        ui.style_mut().spacing.item_spacing = Vec2::new(0.0, -3.0);
+        ui.style_mut().spacing.item_spacing = Vec2::new(0.0, -2.0);
         for line in &self.current_page_contents {
             ui.horizontal(|ui| {
                 if line.preformatted && line.line_type != LineType::PreformatToggle {
@@ -131,31 +131,34 @@ impl ProtocolHandler for Gemini {
                     padded_text.push_str(&" ".repeat(padding_needed));
                     let text = RichText::new(&padded_text)
                         .background_color(Color32::LIGHT_GRAY)
-                        .monospace();
+                        .monospace()
+                        .size(14.0);
                     ui.add_sized([80.0, 16.0], egui::Label::new(text).extend());
                 } else {
                     match line.line_type {
                         LineType::Text => {
+                            let text = RichText::new(&line.content).size(14.0);
                             let label =
-                                egui::Label::new(&line.content).wrap_mode(egui::TextWrapMode::Wrap);
+                                egui::Label::new(text).wrap_mode(egui::TextWrapMode::Wrap);
                             ui.add(label);
                         }
                         LineType::Heading1 => {
                             let content = line.content.replace("# ", "");
-                            ui.add(Label::new(RichText::new(&content).size(24.0)));
+                            ui.label(RichText::new(&content).size(24.0));
                         }
                         LineType::Heading2 => {
                             let content = line.content.replace("## ", "");
-                            ui.add(Label::new(RichText::new(&content).size(22.0)));
+                            ui.label(RichText::new(&content).size(22.0));
                         }
                         LineType::Heading3 => {
                             let content = line.content.replace("### ", "");
-                            ui.add(Label::new(RichText::new(&content).size(20.0)));
+                            ui.label(RichText::new(&content).size(20.0));
                         }
                         LineType::Link => {
                             let link_text = RichText::new(&line.content)
                                 .color(Color32::BLUE)
-                                .underline();
+                                .underline()
+                                .size(14.0);
                             let link = ui.add(Label::new(link_text).sense(egui::Sense::hover()));
                             if link.hovered() {
                                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -178,13 +181,13 @@ impl ProtocolHandler for Gemini {
                         }
                         LineType::Quote => {
                             ui.horizontal(|ui| {
-                                ui.label("| ");
-                                let text = RichText::new(&line.content).italics();
-                                ui.add(egui::Label::new(text));
+                                ui.label(RichText::new("| ").size(14.0));
+                                ui.label(RichText::new(&line.content).italics().size(14.0))
                             });
                         }
                         LineType::List => {
-                            ui.label(format!("• {}", line.content));
+                            let content = format!("• {}", line.content);
+                            ui.label(RichText::new(content).size(14.0));
                         }
                         LineType::PreformatToggle => {}
                     }

@@ -1,4 +1,4 @@
-use eframe::egui::Ui;
+use eframe::egui::{RichText, Ui};
 
 use crate::Breeze;
 
@@ -24,6 +24,7 @@ impl ProtocolHandler for Finger {
     }
 
     fn render_page(&self, ui: &mut Ui, _: &Breeze) {
-        ui.monospace(&self.current_page_contents);
+        let text = RichText::new(&self.current_page_contents).size(14.0);
+        ui.monospace(text);
     }
 }

@@ -1,6 +1,7 @@
 use std::cell::Cell;
 
 use eframe::egui::{self, Color32, Label, RichText, TextEdit, Ui};
+use url::Url;
 
 use crate::Breeze;
 
@@ -197,7 +198,8 @@ impl ProtocolHandler for Gopher {
                     let link_text = RichText::new(&line.user_display_string)
                         .color(Color32::BLUE)
                         .underline()
-                        .monospace();
+                        .monospace()
+                        .size(14.0);
                     let link = ui.add(Label::new(link_text).sense(egui::Sense::hover()));
                     if link.hovered() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -208,17 +210,21 @@ impl ProtocolHandler for Gopher {
                         } else {
                             "".to_string()
                         };
-                        let url = format!("gopher://{}{}{}", line.hostname, port, line.selector);
+                        let mut url = format!("gopher://{}{}{}", line.hostname, port, line.selector);
+                        if line.user_display_string.contains("://") {
+                            url = line.user_display_string.clone();
+                        }
                         breeze.url.set(url.clone());
                         let hint = if line.line_type == LineType::Text {
                             Protocol::Plaintext
                         } else {
-                            Protocol::Gopher
+                            Protocol::from_url(&Url::parse(&url).unwrap())
                         };
                         breeze.navigation_hint.set(Some((url, hint)));
                     }
                 } else {
-                    ui.monospace(&line.user_display_string);
+                    let text = RichText::new(&line.user_display_string).size(14.0);
+                    ui.monospace(text);
                 }
             });
         }
