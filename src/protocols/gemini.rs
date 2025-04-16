@@ -75,14 +75,10 @@ impl GeminiLine {
                         components[2..].join(" ").to_string()
                     };
                     (content, Some(components[1].to_string()))
-                },
-                LineType::Text => {
-                    (s.to_string(), None)
                 }
+                LineType::Text => (s.to_string(), None),
                 LineType::PreformatToggle => ("".to_string(), None),
-                _ => {
-                    (components[1..].join(" ").to_string(), None)
-                }
+                _ => (components[1..].join(" ").to_string(), None),
             }
         };
 
@@ -106,7 +102,6 @@ impl ProtocolHandler for Gemini {
         let Some((_server_code, response)) = response.split_once("\n") else {
             return;
         };
-        println!("Response: {}", response);
         if plaintext {
             let lines: Vec<&str> = response.lines().filter(|line| line != &".").collect();
             let gemini_line = GeminiLine::from_str(&lines.join("\n"), plaintext, self);
@@ -134,26 +129,29 @@ impl ProtocolHandler for Gemini {
                     let mut padded_text = line.content.clone();
                     let padding_needed = 80_usize.saturating_sub(padded_text.len());
                     padded_text.push_str(&" ".repeat(padding_needed));
-                    let text = RichText::new(&padded_text).background_color(Color32::LIGHT_GRAY).monospace();
+                    let text = RichText::new(&padded_text)
+                        .background_color(Color32::LIGHT_GRAY)
+                        .monospace();
                     ui.add_sized([80.0, 16.0], egui::Label::new(text).extend());
                 } else {
                     match line.line_type {
                         LineType::Text => {
-                            let label = egui::Label::new(&line.content).wrap_mode(egui::TextWrapMode::Wrap);
+                            let label =
+                                egui::Label::new(&line.content).wrap_mode(egui::TextWrapMode::Wrap);
                             ui.add(label);
-                        },
+                        }
                         LineType::Heading1 => {
                             let content = line.content.replace("# ", "");
                             ui.add(Label::new(RichText::new(&content).size(24.0)));
-                        },
+                        }
                         LineType::Heading2 => {
                             let content = line.content.replace("## ", "");
                             ui.add(Label::new(RichText::new(&content).size(22.0)));
-                        },
+                        }
                         LineType::Heading3 => {
                             let content = line.content.replace("### ", "");
                             ui.add(Label::new(RichText::new(&content).size(20.0)));
-                        },
+                        }
                         LineType::Link => {
                             let link_text = RichText::new(&line.content)
                                 .color(Color32::BLUE)
@@ -163,7 +161,8 @@ impl ProtocolHandler for Gemini {
                                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                             }
                             if link.clicked() {
-                                let path = line.path.clone().expect("Gemini link line without path!");
+                                let path =
+                                    line.path.clone().expect("Gemini link line without path!");
                                 let current_url = breeze.current_url.clone();
                                 let current_url = current_url.join(&path).unwrap();
                                 breeze.url.set(current_url.to_string());
@@ -172,7 +171,9 @@ impl ProtocolHandler for Gemini {
                                 } else {
                                     Protocol::Gemini
                                 };
-                                breeze.navigation_hint.set(Some((current_url.to_string(), hint)));
+                                breeze
+                                    .navigation_hint
+                                    .set(Some((current_url.to_string(), hint)));
                             }
                         }
                         LineType::Quote => {
@@ -185,7 +186,7 @@ impl ProtocolHandler for Gemini {
                         LineType::List => {
                             ui.label(format!("• {}", line.content));
                         }
-                        LineType::PreformatToggle => {},
+                        LineType::PreformatToggle => {}
                     }
                 }
             });

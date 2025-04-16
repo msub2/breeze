@@ -39,12 +39,24 @@ fn main() -> eframe::Result {
 }
 
 #[derive(Default)]
-struct ProtocolHandlers {
+struct ContentHandlers {
     finger: Finger,
-    gemini: Gemini,
+    gemtext: Gemini,
     gopher: Gopher,
     nex: Nex,
     textprotocol: TextProtocol,
+}
+
+impl ContentHandlers {
+    pub fn parse_content(&mut self, response: &str, plaintext: bool, protocol: Protocol) {
+        match protocol {
+            Protocol::Finger => self.finger.parse_content(response, plaintext),
+            Protocol::Gemini | Protocol::Spartan => self.gemtext.parse_content(response, plaintext),
+            Protocol::Gopher => self.gopher.parse_content(response, plaintext),
+            Protocol::Nex => self.nex.parse_content(response, plaintext),
+            _ => self.textprotocol.parse_content(response, plaintext),
+        }
+    }
 }
 
 struct Breeze {
@@ -54,7 +66,7 @@ struct Breeze {
     current_url: Url,
     /// The plaintext response from the server for this page
     page_content: String,
-    protocol_handlers: ProtocolHandlers,
+    content_handlers: ContentHandlers,
     navigation_hint: Cell<Option<(String, Protocol)>>,
     reset_scroll_pos: bool,
 }
@@ -66,7 +78,7 @@ impl Breeze {
             url: Cell::new(starting_url.to_string()),
             current_url: starting_url.clone(),
             page_content: "".to_string(),
-            protocol_handlers: Default::default(),
+            content_handlers: Default::default(),
             navigation_hint: Cell::new(Some((
                 starting_url.to_string(),
                 Protocol::from_url(&starting_url),
@@ -87,153 +99,54 @@ impl Breeze {
             self.page_content = "Invalid URL".to_string();
             return;
         }
-        match protocol {
+
+        let hostname = self.current_url.host_str().expect("Hostname is empty!");
+        let path = self.current_url.path();
+        let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext);
+        let response = match protocol {
             Protocol::Finger => {
-                let mut selector = self.current_url.path();
-                if selector.starts_with("/") {
-                    selector = &selector[1..];
-                }
-                let response = fetch(
-                    self.current_url.host_str().unwrap(),
-                    self.current_url.port().unwrap_or(79),
-                    selector,
-                    false,
-                );
-                match response {
-                    Ok(response) => {
-                        self.page_content = response;
-                        self.protocol_handlers
-                            .finger
-                            .parse_content(&self.page_content, true);
-                    }
-                    Err(error) => {
-                        self.page_content = error;
-                        self.protocol_handlers
-                            .finger
-                            .parse_content(&self.page_content, true);
-                    }
-                }
+                let port = self.current_url.port().unwrap_or(79);
+                let selector = if let Some(stripped) = path.strip_prefix("/") {
+                    stripped
+                } else {
+                    path
+                };
+                fetch(hostname, port, selector, false)
             }
             Protocol::Gemini => {
-                let response = fetch(
-                    self.current_url.host_str().unwrap(),
-                    self.current_url.port().unwrap_or(1965),
-                    self.current_url.as_str(),
-                    true,
-                );
-                match response {
-                    Ok(response) => {
-                        self.page_content = response;
-                        let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext);
-                        self.protocol_handlers
-                            .gemini
-                            .parse_content(&self.page_content, plaintext);
-                    }
-                    Err(error) => {
-                        self.page_content = error;
-                        self.protocol_handlers
-                            .gemini
-                            .parse_content(&self.page_content, true);
-                    }
-                }
+                let port = self.current_url.port().unwrap_or(1965);
+                fetch(hostname, port, self.current_url.as_str(), true)
             }
             Protocol::Gopher => {
-                let response = fetch(
-                    self.current_url.host_str().unwrap(),
-                    self.current_url.port().unwrap_or(70),
-                    &format!(
-                        "{}\t{}",
-                        self.current_url.path(),
-                        self.current_url.query().unwrap_or("")
-                    ),
-                    false,
-                );
-                match response {
-                    Ok(response) => {
-                        self.page_content = response;
-                        let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext);
-                        self.protocol_handlers
-                            .gopher
-                            .parse_content(&self.page_content, plaintext);
-                    }
-                    Err(error) => {
-                        self.page_content = error;
-                        self.protocol_handlers
-                            .gopher
-                            .parse_content(&self.page_content, true);
-                    }
-                }
+                let port = self.current_url.port().unwrap_or(70);
+                let selector = &format!("{}\t{}", path, self.current_url.query().unwrap_or(""));
+                fetch(hostname, port, selector, false)
             }
             Protocol::Nex => {
-                let response = fetch(
-                    self.current_url.host_str().unwrap(),
-                    self.current_url.port().unwrap_or(1900),
-                    self.current_url.path(),
-                    false,
-                );
-                match response {
-                    Ok(response) => {
-                        self.page_content = response;
-                        self.protocol_handlers.nex.parse_content(
-                            &self.page_content,
-                            self.current_url.path().ends_with(".txt"),
-                        );
-                    }
-                    Err(error) => {
-                        self.page_content = error;
-                        self.protocol_handlers
-                            .nex
-                            .parse_content(&self.page_content, true);
-                    }
-                }
+                let port = self.current_url.port().unwrap_or(1900);
+                fetch(hostname, port, path, false)
             }
             Protocol::Spartan => {
-                let response = fetch(
-                    self.current_url.host_str().unwrap(),
-                    self.current_url.port().unwrap_or(300),
-                    &format!("{} {} {}", self.current_url.host_str().unwrap(), self.current_url.path(), 0),
-                    false,
-                );
-                match response {
-                    Ok(response) => {
-                        self.page_content = response;
-                        self.protocol_handlers.gemini.parse_content(
-                            &self.page_content,
-                            self.current_url.path().ends_with(".txt"),
-                        );
-                    }
-                    Err(error) => {
-                        self.page_content = error;
-                        self.protocol_handlers
-                            .gemini
-                            .parse_content(&self.page_content, true);
-                    }
-                }
+                let port = self.current_url.port().unwrap_or(300);
+                let selector = &format!("{} {} {}", hostname, path, 0);
+                fetch(hostname, port, selector, false)
             }
             Protocol::TextProtocol => {
-                let response = fetch(
-                    self.current_url.host_str().unwrap(),
-                    self.current_url.port().unwrap_or(1961),
-                    self.current_url.as_str(),
-                    false,
-                );
-                match response {
-                    Ok(response) => {
-                        self.page_content = response;
-                        self.protocol_handlers.textprotocol.parse_content(
-                            &self.page_content,
-                            self.current_url.path().ends_with(".txt"),
-                        );
-                    }
-                    Err(error) => {
-                        self.page_content = error;
-                        self.protocol_handlers
-                            .textprotocol
-                            .parse_content(&self.page_content, true);
-                    }
-                }
+                let port = self.current_url.port().unwrap_or(1961);
+                let selector = self.current_url.as_str();
+                fetch(hostname, port, selector, false)
             }
             _ => unreachable!(),
+        };
+        match response {
+            Ok(response) => {
+                println!("{}", response);
+                self.content_handlers
+                    .parse_content(&response, plaintext, protocol);
+            }
+            Err(error) => {
+                self.content_handlers.parse_content(&error, true, protocol);
+            }
         }
     }
 }
@@ -277,30 +190,18 @@ impl eframe::App for Breeze {
                 scroll_area = scroll_area.scroll_offset([0.0, 0.0].into());
                 self.reset_scroll_pos = false;
             }
-            scroll_area.show(ui, |ui| match Protocol::from_url(&self.current_url) {
-                Protocol::Finger => {
-                    self.protocol_handlers.finger.render_page(ui, self);
-                }
-                Protocol::Gemini => {
-                    self.protocol_handlers.gemini.render_page(ui, self);
-                }
-                Protocol::Gopher => {
-                    self.protocol_handlers.gopher.render_page(ui, self);
-                }
-                Protocol::Nex => {
-                    self.protocol_handlers.nex.render_page(ui, self);
-                }
-                Protocol::Scorpion => {
-                    todo!()
-                }
-                Protocol::Spartan => {
-                    self.protocol_handlers.gemini.render_page(ui, self);
-                }
-                Protocol::TextProtocol => {
-                    self.protocol_handlers.textprotocol.render_page(ui, self);
-                }
-                Protocol::Plaintext | Protocol::Unknown => {
-                    let _ = ui.monospace(&self.page_content);
+            scroll_area.show(ui, |ui| {
+                let protocol = Protocol::from_url(&self.current_url);
+                match protocol {
+                    Protocol::Gemini | Protocol::Spartan => {
+                        self.content_handlers.gemtext.render_page(ui, self);
+                    }
+                    Protocol::Gopher => {
+                        self.content_handlers.gopher.render_page(ui, self);
+                    }
+                    _ => {
+                        self.content_handlers.textprotocol.render_page(ui, self);
+                    }
                 }
             });
         });
