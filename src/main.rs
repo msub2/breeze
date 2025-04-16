@@ -104,7 +104,7 @@ struct Breeze {
 
 impl Breeze {
     fn new() -> Self {
-        let starting_url = Url::from_str("guppy://gemini.dimakrasner.com/").unwrap();
+        let starting_url = Url::from_str("scorpion://zzo38computer.org/").unwrap();
         Self {
             url: Cell::new(starting_url.to_string()),
             current_url: starting_url.clone(),
@@ -164,7 +164,8 @@ impl Breeze {
             }
             Protocol::Scorpion => {
                 let port = self.current_url.port().unwrap_or(1517);
-                fetch(hostname, port, self.current_url.as_str(), false)
+                let selector = format!("R {}", self.current_url.as_str());
+                fetch(hostname, port, &selector, false)
             }
             Protocol::Spartan => {
                 let port = self.current_url.port().unwrap_or(300);
