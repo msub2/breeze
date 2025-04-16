@@ -99,6 +99,7 @@ pub struct Gemini {
 
 impl ProtocolHandler for Gemini {
     fn parse_content(&mut self, response: &str, plaintext: bool) {
+        self.preformat_line = false; // Reset preformat flag on new page load
         let Some((_server_code, response)) = response.split_once("\n") else {
             return;
         };
@@ -138,8 +139,7 @@ impl ProtocolHandler for Gemini {
                     match line.line_type {
                         LineType::Text => {
                             let text = RichText::new(&line.content).size(14.0);
-                            let label =
-                                egui::Label::new(text).wrap_mode(egui::TextWrapMode::Wrap);
+                            let label = egui::Label::new(text).wrap_mode(egui::TextWrapMode::Wrap);
                             ui.add(label);
                         }
                         LineType::Heading1 => {

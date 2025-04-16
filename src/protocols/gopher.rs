@@ -210,7 +210,8 @@ impl ProtocolHandler for Gopher {
                         } else {
                             "".to_string()
                         };
-                        let mut url = format!("gopher://{}{}{}", line.hostname, port, line.selector);
+                        let mut url =
+                            format!("gopher://{}{}{}", line.hostname, port, line.selector);
                         if line.user_display_string.contains("://") {
                             url = line.user_display_string.clone();
                         }

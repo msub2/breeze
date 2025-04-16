@@ -7,12 +7,12 @@ mod protocols;
 use std::cell::Cell;
 use std::str::FromStr;
 
-use egui::{FontData, FontDefinitions, FontFamily};
 use eframe::egui::{self};
+use egui::{FontData, FontDefinitions, FontFamily};
 use url::Url;
 
 use crate::history::{add_entry, can_go_back, can_go_forward};
-use crate::networking::fetch;
+use crate::networking::{fetch, fetch_udp};
 use crate::protocols::finger::Finger;
 use crate::protocols::gemini::Gemini;
 use crate::protocols::gopher::Gopher;
@@ -32,20 +32,27 @@ fn main() -> eframe::Result {
     // Inconsolata for uniform monospace font
     fonts.font_data.insert(
         "Inconsolata".to_owned(),
-        std::sync::Arc::new(
-            FontData::from_static(include_bytes!("../res/Inconsolata.ttf"))
-        )
+        std::sync::Arc::new(FontData::from_static(include_bytes!(
+            "../res/Inconsolata.ttf"
+        ))),
     );
-    fonts.families.get_mut(&FontFamily::Monospace).unwrap()
+    fonts
+        .families
+        .get_mut(&FontFamily::Monospace)
+        .unwrap()
         .insert(0, "Inconsolata".to_owned());
     // Segoe UI Symbols for rendering extended Unicode chars
     fonts.font_data.insert(
         "SegoeUISymbol".to_owned(),
-        std::sync::Arc::new(
-            FontData::from_static(include_bytes!("../res/segoe-ui-symbol.ttf"))
-        )
+        std::sync::Arc::new(FontData::from_static(include_bytes!(
+            "../res/segoe-ui-symbol.ttf"
+        ))),
     );
-    fonts.families.get_mut(&FontFamily::Monospace).unwrap().push("SegoeUISymbol".to_string());
+    fonts
+        .families
+        .get_mut(&FontFamily::Monospace)
+        .unwrap()
+        .push("SegoeUISymbol".to_string());
 
     eframe::run_native(
         "Breeze",
@@ -73,7 +80,9 @@ impl ContentHandlers {
     pub fn parse_content(&mut self, response: &str, plaintext: bool, protocol: Protocol) {
         match protocol {
             Protocol::Finger => self.finger.parse_content(response, plaintext),
-            Protocol::Gemini | Protocol::Spartan => self.gemtext.parse_content(response, plaintext),
+            Protocol::Gemini | Protocol::Spartan | Protocol::Guppy => {
+                self.gemtext.parse_content(response, plaintext)
+            }
             Protocol::Gopher => self.gopher.parse_content(response, plaintext),
             Protocol::Nex => self.nex.parse_content(response, plaintext),
             _ => self.plaintext.parse_content(response, plaintext),
@@ -95,7 +104,7 @@ struct Breeze {
 
 impl Breeze {
     fn new() -> Self {
-        let starting_url = Url::from_str("spartan://mozz.us/test.gmi").unwrap();
+        let starting_url = Url::from_str("guppy://gemini.dimakrasner.com/").unwrap();
         Self {
             url: Cell::new(starting_url.to_string()),
             current_url: starting_url.clone(),
@@ -145,9 +154,17 @@ impl Breeze {
                 let selector = &format!("{}\t{}", path, self.current_url.query().unwrap_or(""));
                 fetch(hostname, port, selector, false)
             }
+            Protocol::Guppy => {
+                let port = self.current_url.port().unwrap_or(6775);
+                fetch_udp(hostname, port, self.current_url.as_str(), false)
+            }
             Protocol::Nex => {
                 let port = self.current_url.port().unwrap_or(1900);
                 fetch(hostname, port, path, false)
+            }
+            Protocol::Scorpion => {
+                let port = self.current_url.port().unwrap_or(1517);
+                fetch(hostname, port, self.current_url.as_str(), false)
             }
             Protocol::Spartan => {
                 let port = self.current_url.port().unwrap_or(300);
@@ -219,7 +236,7 @@ impl eframe::App for Breeze {
                     Protocol::Finger => {
                         self.content_handlers.finger.render_page(ui, self);
                     }
-                    Protocol::Gemini | Protocol::Spartan => {
+                    Protocol::Gemini | Protocol::Spartan | Protocol::Guppy => {
                         self.content_handlers.gemtext.render_page(ui, self);
                     }
                     Protocol::Gopher => {

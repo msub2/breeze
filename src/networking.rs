@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::io::{BufRead, Read, Write};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::sync::{LazyLock, Mutex};
 
 use native_tls::TlsConnector;
@@ -57,5 +57,52 @@ pub fn fetch(hostname: &str, port: u16, selector: &str, ssl: bool) -> Result<Str
     } else {
         buf.push_str(&format!("Failed to connect to hostname: {}", hostname));
         Err(buf)
+    }
+}
+
+pub fn fetch_udp(hostname: &str, port: u16, selector: &str, _ssl: bool) -> Result<String, String> {
+    let url = format!("{}:{}", hostname, port);
+    let request = format!("{}\r\n", selector);
+    // println!("{}", request);
+    let mut data = Vec::new();
+    let mut completed = false;
+
+    if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
+        let addrs = url.to_socket_addrs().unwrap().collect::<Vec<_>>();
+        socket.connect(addrs.first().unwrap()).unwrap();
+        socket.send(request.as_bytes()).map_err(|e| e.to_string())?;
+        while !completed {
+            let mut buf = [0; 16384];
+            socket.recv(buf.as_mut()).map_err(|e| e.to_string())?;
+            let first_line = buf.lines().next().unwrap().unwrap();
+            let server_info = first_line.split(' ').collect::<Vec<_>>();
+            if let Some(content_type) = server_info.get(1) {
+                // TODO: This is a hack, need to properly respond to server codes when needed
+                data.extend_from_slice(format!("{}\n", content_type).as_bytes());
+            }
+            if let Some(seq) = server_info.first() {
+                let data_lines = buf.lines().skip(1).collect::<Vec<_>>();
+                if data_lines.len() == 1 {
+                    completed = true;
+                } else {
+                    let newbuf = buf
+                        .iter()
+                        .filter_map(|b| if *b != 0 { Some(*b) } else { None })
+                        .collect::<Vec<_>>();
+                    let string = String::from_utf8_lossy(&newbuf).to_string();
+                    let newstring = string.split_once("\n").unwrap().1;
+                    data.extend(newstring.as_bytes());
+                    socket
+                        .send(format!("{}\r\n", seq).as_bytes())
+                        .map_err(|e| e.to_string())?;
+                }
+            } else {
+                completed = true;
+            }
+        }
+        //println!("{}", String::from_utf8_lossy(&data).to_string());
+        Ok(String::from_utf8_lossy(&data).to_string())
+    } else {
+        Err(format!("Failed to connect to hostname: {}", hostname))
     }
 }
