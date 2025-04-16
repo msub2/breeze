@@ -7,8 +7,8 @@ mod protocols;
 use std::cell::Cell;
 use std::str::FromStr;
 
+use egui::{FontData, FontDefinitions, FontFamily};
 use eframe::egui;
-use protocols::textprotocol::TextProtocol;
 use url::Url;
 
 use crate::history::{add_entry, can_go_back, can_go_forward};
@@ -17,6 +17,7 @@ use crate::protocols::finger::Finger;
 use crate::protocols::gemini::Gemini;
 use crate::protocols::gopher::Gopher;
 use crate::protocols::nex::Nex;
+use crate::protocols::plaintext::Plaintext;
 use crate::protocols::{Protocol, ProtocolHandler};
 
 fn main() -> eframe::Result {
@@ -26,12 +27,23 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
 
+    let mut fonts = FontDefinitions::default();
+    fonts.font_data.insert(
+        "Inconsolata".to_owned(),
+        std::sync::Arc::new(
+            FontData::from_static(include_bytes!("../res/Inconsolata.ttf"))
+        )
+    );
+    fonts.families.get_mut(&FontFamily::Monospace).unwrap()
+        .insert(0, "Inconsolata".to_owned());
+
     eframe::run_native(
         "Breeze",
         options,
         Box::new(|cc| {
             // This gives us image support:
             egui_extras::install_image_loaders(&cc.egui_ctx);
+            cc.egui_ctx.set_fonts(fonts);
 
             Ok(Box::<Breeze>::new(Breeze::new()))
         }),
@@ -44,7 +56,7 @@ struct ContentHandlers {
     gemtext: Gemini,
     gopher: Gopher,
     nex: Nex,
-    textprotocol: TextProtocol,
+    plaintext: Plaintext,
 }
 
 impl ContentHandlers {
@@ -54,7 +66,7 @@ impl ContentHandlers {
             Protocol::Gemini | Protocol::Spartan => self.gemtext.parse_content(response, plaintext),
             Protocol::Gopher => self.gopher.parse_content(response, plaintext),
             Protocol::Nex => self.nex.parse_content(response, plaintext),
-            _ => self.textprotocol.parse_content(response, plaintext),
+            _ => self.plaintext.parse_content(response, plaintext),
         }
     }
 }
@@ -200,7 +212,7 @@ impl eframe::App for Breeze {
                         self.content_handlers.gopher.render_page(ui, self);
                     }
                     _ => {
-                        self.content_handlers.textprotocol.render_page(ui, self);
+                        self.content_handlers.plaintext.render_page(ui, self);
                     }
                 }
             });

@@ -2,7 +2,7 @@ pub mod finger;
 pub mod gemini;
 pub mod gopher;
 pub mod nex;
-pub mod textprotocol;
+pub mod plaintext;
 
 use eframe::egui;
 use url::Url;
