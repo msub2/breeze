@@ -1,6 +1,6 @@
 # Breeze - A SmolNet Browser
 
-Breeze is an OCaml-based browser for various "SmolNet" protocols like Gopher, Gemini, Spartan, Guppy, Nex, and more.
+Breeze is an Rust-based browser for various "SmolNet" protocols like Gopher, Gemini, Spartan, Guppy, Nex, and more.
 
 ## Protocol Support
 
@@ -32,7 +32,8 @@ Below are the following protocols that Breeze should ideally be able to speak. "
 - Titan
   - [ ] Usable
 - Scorpion
-  - [ ] Usable
+  - [x] Usable
+    - Proper document rendering not yet implemented
   - [ ] Navigable
 - Text Protocol
   - [x] Usable
@@ -45,8 +46,8 @@ Below are the following protocols that Breeze should ideally be able to speak. "
   - [x] Navigable
   - [ ] NPS
 - Guppy
-  - [ ] Usable
-  - [ ] Navigable
+  - [x] Usable
+  - [x] Navigable
 - Scroll
   - [ ] Usable
   - [ ] Navigable
