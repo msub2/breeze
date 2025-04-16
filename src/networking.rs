@@ -63,7 +63,6 @@ pub fn fetch(hostname: &str, port: u16, selector: &str, ssl: bool) -> Result<Str
 pub fn fetch_udp(hostname: &str, port: u16, selector: &str, _ssl: bool) -> Result<String, String> {
     let url = format!("{}:{}", hostname, port);
     let request = format!("{}\r\n", selector);
-    // println!("{}", request);
     let mut data = Vec::new();
     let mut completed = false;
 
@@ -100,7 +99,6 @@ pub fn fetch_udp(hostname: &str, port: u16, selector: &str, _ssl: bool) -> Resul
                 completed = true;
             }
         }
-        //println!("{}", String::from_utf8_lossy(&data).to_string());
         Ok(String::from_utf8_lossy(&data).to_string())
     } else {
         Err(format!("Failed to connect to hostname: {}", hostname))

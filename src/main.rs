@@ -141,11 +141,7 @@ impl Breeze {
         let response = match protocol {
             Protocol::Finger => {
                 let port = self.current_url.port().unwrap_or(79);
-                let selector = if let Some(stripped) = path.strip_prefix("/") {
-                    stripped
-                } else {
-                    path
-                };
+                let selector = path.strip_prefix("/").unwrap_or(path);
                 fetch(hostname, port, selector, false)
             }
             Protocol::Gemini => {
@@ -234,18 +230,12 @@ impl eframe::App for Breeze {
             scroll_area.show(ui, |ui| {
                 let protocol = Protocol::from_url(&self.current_url);
                 match protocol {
-                    Protocol::Finger => {
-                        self.content_handlers.finger.render_page(ui, self);
-                    }
+                    Protocol::Finger => self.content_handlers.finger.render_page(ui, self),
                     Protocol::Gemini | Protocol::Spartan | Protocol::Guppy => {
                         self.content_handlers.gemtext.render_page(ui, self);
                     }
-                    Protocol::Gopher => {
-                        self.content_handlers.gopher.render_page(ui, self);
-                    }
-                    _ => {
-                        self.content_handlers.plaintext.render_page(ui, self);
-                    }
+                    Protocol::Gopher => self.content_handlers.gopher.render_page(ui, self),
+                    _ => self.content_handlers.plaintext.render_page(ui, self),
                 }
             });
         });
