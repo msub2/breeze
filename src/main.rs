@@ -6,9 +6,12 @@ mod protocols;
 
 use std::cell::Cell;
 use std::str::FromStr;
+use std::sync::Arc;
 
-use eframe::egui::{self};
-use egui::{FontData, FontDefinitions, FontFamily};
+use eframe::egui::{
+    Button, CentralPanel, Context, FontData, FontDefinitions, FontFamily, Key, ScrollArea,
+    ViewportBuilder,
+};
 use url::Url;
 
 use crate::history::{add_entry, can_go_back, can_go_forward};
@@ -23,7 +26,7 @@ use crate::protocols::{Protocol, ProtocolHandler};
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([640.0, 480.0]),
+        viewport: ViewportBuilder::default().with_inner_size([640.0, 480.0]),
         ..Default::default()
     };
 
@@ -32,7 +35,7 @@ fn main() -> eframe::Result {
     // Inconsolata for uniform monospace font
     fonts.font_data.insert(
         "Inconsolata".to_owned(),
-        std::sync::Arc::new(FontData::from_static(include_bytes!(
+        Arc::new(FontData::from_static(include_bytes!(
             "../res/Inconsolata.ttf"
         ))),
     );
@@ -44,7 +47,7 @@ fn main() -> eframe::Result {
     // Segoe UI Symbols for rendering extended Unicode chars
     fonts.font_data.insert(
         "SegoeUISymbol".to_owned(),
-        std::sync::Arc::new(FontData::from_static(include_bytes!(
+        Arc::new(FontData::from_static(include_bytes!(
             "../res/segoe-ui-symbol.ttf"
         ))),
     );
@@ -193,21 +196,18 @@ impl Breeze {
 }
 
 impl eframe::App for Breeze {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+    fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+        CentralPanel::default().show(ctx, |ui| {
             // Navigation and address bar
             ui.horizontal(|ui| {
-                if ui
-                    .add_enabled(can_go_back(), egui::Button::new("Back"))
-                    .clicked()
-                {
+                if ui.add_enabled(can_go_back(), Button::new("Back")).clicked() {
                     if let Some(entry) = history::back() {
                         self.url.set(entry.url.to_string());
                         self.navigate(Some(entry.protocol), false);
                     }
                 }
                 if ui
-                    .add_enabled(can_go_forward(), egui::Button::new("Forward"))
+                    .add_enabled(can_go_forward(), Button::new("Forward"))
                     .clicked()
                 {
                     if let Some(entry) = history::forward() {
@@ -216,7 +216,7 @@ impl eframe::App for Breeze {
                     }
                 }
                 let url = ui.text_edit_singleline(self.url.get_mut());
-                if url.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+                if url.lost_focus() && ui.input(|input| input.key_pressed(Key::Enter)) {
                     self.navigate(None, true);
                 }
                 if ui.button("Go").clicked() {
@@ -226,7 +226,7 @@ impl eframe::App for Breeze {
             ui.separator();
 
             // Page content
-            let mut scroll_area = egui::ScrollArea::both().auto_shrink(false);
+            let mut scroll_area = ScrollArea::both().auto_shrink(false);
             if self.reset_scroll_pos {
                 scroll_area = scroll_area.scroll_offset([0.0, 0.0].into());
                 self.reset_scroll_pos = false;
