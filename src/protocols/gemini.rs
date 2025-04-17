@@ -48,9 +48,7 @@ struct GeminiLine {
 
 impl GeminiLine {
     fn from_str(s: &str, plaintext: bool, gemini: &mut Gemini) -> Self {
-        let components = s.split_ascii_whitespace().collect::<Vec<&str>>();
-
-        if plaintext || components.is_empty() {
+        if plaintext || s.is_empty() {
             // Treat every line as an informational one
             return Self {
                 line_type: LineType::Text,
@@ -60,7 +58,7 @@ impl GeminiLine {
             };
         }
 
-        let line_type = LineType::from_str(components[0]);
+        let line_type = LineType::from_str(s);
         if line_type == LineType::PreformatToggle {
             gemini.preformat_line = !gemini.preformat_line;
         }
@@ -69,16 +67,17 @@ impl GeminiLine {
         } else {
             match line_type {
                 LineType::Link => {
-                    let content = if components.len() == 2 {
-                        components[1].to_string()
-                    } else {
-                        components[2..].join(" ").to_string()
-                    };
-                    (content, Some(components[1].to_string()))
+                    let content = s[2..].trim().to_string();
+                    match content.split_once(char::is_whitespace) {
+                        Some((path, display_string)) => {
+                            (display_string.trim().to_string(), Some(path.to_string()))
+                        },
+                        None => (content.clone(), Some(content)),
+                    }
                 }
                 LineType::Text => (s.to_string(), None),
                 LineType::PreformatToggle => ("".to_string(), None),
-                _ => (components[1..].join(" ").to_string(), None),
+                _ => (s.to_string(), None),
             }
         };
 
@@ -186,7 +185,7 @@ impl ProtocolHandler for Gemini {
                             });
                         }
                         LineType::List => {
-                            let content = format!("• {}", line.content);
+                            let content = line.content.replace("*", "•");
                             ui.label(RichText::new(content).size(14.0));
                         }
                         LineType::PreformatToggle => {}
