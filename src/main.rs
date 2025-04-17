@@ -150,12 +150,16 @@ impl Breeze {
         if path.is_empty() {
             path = "/".to_string();
         }
-        let query = self.current_url.query().unwrap_or("");
+        let query = if let Some(q) = self.current_url.query() {
+            &format!("\t{}", q)
+        } else {
+            ""
+        };
         let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext);
         let (selector, ssl) = match protocol {
             Protocol::Finger => (path.strip_prefix("/").unwrap_or(&path).to_string(), false),
             Protocol::Gemini => (current_url, true),
-            Protocol::Gopher(ssl) => (format!("{}\t{}", path, query), ssl),
+            Protocol::Gopher(ssl) => (format!("{}{}", path, query), ssl),
             Protocol::Guppy => (current_url, false),
             Protocol::Nex => (path, false),
             Protocol::Scorpion => (format!("R {}", current_url), false),
