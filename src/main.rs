@@ -9,8 +9,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use eframe::egui::{
-    Button, CentralPanel, Context, FontData, FontDefinitions, FontFamily, Key, ScrollArea,
-    ViewportBuilder,
+    Button, CentralPanel, Context, FontData, FontDefinitions, FontFamily, IconData, Image, Key,
+    ScrollArea, ViewportBuilder,
 };
 use url::Url;
 
@@ -25,8 +25,19 @@ use crate::protocols::{Protocol, ProtocolHandler};
 
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    let icon = include_bytes!("../res/breeze32.png");
+    let image = image::load_from_memory(icon)
+        .expect("Failed to open icon path")
+        .to_rgba8();
+    let viewport = ViewportBuilder::default()
+        .with_inner_size([640.0, 480.0])
+        .with_icon(IconData {
+            rgba: image.into_raw(),
+            width: 32,
+            height: 32,
+        });
     let options = eframe::NativeOptions {
-        viewport: ViewportBuilder::default().with_inner_size([640.0, 480.0]),
+        viewport,
         ..Default::default()
     };
 
