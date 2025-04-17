@@ -86,7 +86,7 @@ impl ContentHandlers {
             Protocol::Gemini | Protocol::Spartan | Protocol::Guppy => {
                 self.gemtext.parse_content(response, plaintext)
             }
-            Protocol::Gopher => self.gopher.parse_content(response, plaintext),
+            Protocol::Gopher(_) => self.gopher.parse_content(response, plaintext),
             Protocol::Nex => self.nex.parse_content(response, plaintext),
             _ => self.plaintext.parse_content(response, plaintext),
         }
@@ -148,10 +148,10 @@ impl Breeze {
                 let port = self.current_url.port().unwrap_or(1965);
                 fetch(hostname, port, self.current_url.as_str(), true)
             }
-            Protocol::Gopher => {
+            Protocol::Gopher(ssl) => {
                 let port = self.current_url.port().unwrap_or(70);
                 let selector = &format!("{}\t{}", path, self.current_url.query().unwrap_or(""));
-                fetch(hostname, port, selector, false)
+                fetch(hostname, port, selector, ssl)
             }
             Protocol::Guppy => {
                 let port = self.current_url.port().unwrap_or(6775);
@@ -234,7 +234,7 @@ impl eframe::App for Breeze {
                     Protocol::Gemini | Protocol::Spartan | Protocol::Guppy => {
                         self.content_handlers.gemtext.render_page(ui, self);
                     }
-                    Protocol::Gopher => self.content_handlers.gopher.render_page(ui, self),
+                    Protocol::Gopher(_) => self.content_handlers.gopher.render_page(ui, self),
                     _ => self.content_handlers.plaintext.render_page(ui, self),
                 }
             });

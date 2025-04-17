@@ -11,7 +11,7 @@ use url::Url;
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Protocol {
     Finger,
-    Gopher,
+    Gopher(bool),
     Gemini,
     Guppy,
     Nex,
@@ -27,7 +27,8 @@ impl Protocol {
         match url.scheme() {
             "finger" => Protocol::Finger,
             "gemini" => Protocol::Gemini,
-            "gopher" => Protocol::Gopher,
+            "gopher" => Protocol::Gopher(false),
+            "gophers" => Protocol::Gopher(true),
             "guppy" => Protocol::Guppy,
             "nex" => Protocol::Nex,
             "scorpion" => Protocol::Scorpion,

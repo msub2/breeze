@@ -19,8 +19,8 @@ Below are the following protocols that Breeze should ideally be able to speak. "
   - [ ] Navigable
   - [ ] Gophermap Additions
 - Gopher w/ TLS
-  - [ ] Usable
-  - [ ] Navigable
+  - [x] Usable
+  - [x] Navigable
 - Gemini
   - [x] Usable
   - [x] Navigable

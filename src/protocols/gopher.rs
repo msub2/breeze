@@ -187,12 +187,13 @@ impl ProtocolHandler for Gopher {
                         } else {
                             "".to_string()
                         };
+                        let scheme = breeze.current_url.scheme();
                         let url = format!(
-                            "gopher://{}{}{}?{}",
-                            line.hostname, port, line.selector, &current_search
+                            "{}://{}{}{}?{}",
+                            scheme, line.hostname, port, line.selector, &current_search
                         );
                         breeze.url.set(url.clone());
-                        breeze.navigation_hint.set(Some((url, Protocol::Gopher)));
+                        breeze.navigation_hint.set(Some((url, Protocol::Gopher(false))));
                     }
                 } else if line.is_link {
                     let link_text = RichText::new(&line.user_display_string)
@@ -210,8 +211,9 @@ impl ProtocolHandler for Gopher {
                         } else {
                             "".to_string()
                         };
+                        let scheme = breeze.current_url.scheme();
                         let mut url =
-                            format!("gopher://{}{}{}", line.hostname, port, line.selector);
+                            format!("{}://{}{}{}", scheme, line.hostname, port, line.selector);
                         if line.user_display_string.contains("://") {
                             url = line.user_display_string.clone();
                         }
