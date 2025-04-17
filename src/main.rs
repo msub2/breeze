@@ -2,7 +2,7 @@
 
 mod history;
 mod networking;
-mod protocols;
+mod handlers;
 
 use std::cell::Cell;
 use std::str::FromStr;
@@ -16,12 +16,12 @@ use url::Url;
 
 use crate::history::{add_entry, can_go_back, can_go_forward};
 use crate::networking::fetch;
-use crate::protocols::finger::Finger;
-use crate::protocols::gemini::Gemini;
-use crate::protocols::gopher::Gopher;
-use crate::protocols::nex::Nex;
-use crate::protocols::plaintext::Plaintext;
-use crate::protocols::{Protocol, ProtocolHandler};
+use crate::handlers::finger::Finger;
+use crate::handlers::gemini::Gemini;
+use crate::handlers::gopher::Gopher;
+use crate::handlers::nex::Nex;
+use crate::handlers::plaintext::Plaintext;
+use crate::handlers::{Protocol, ProtocolHandler};
 
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).

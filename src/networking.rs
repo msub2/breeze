@@ -6,7 +6,7 @@ use std::sync::{LazyLock, Mutex};
 use native_tls::TlsConnector;
 use url::Url;
 
-use crate::protocols::Protocol;
+use crate::handlers::Protocol;
 
 #[allow(dead_code)]
 static DNS_CACHE: LazyLock<Mutex<HashMap<String, Vec<SocketAddr>>>> =

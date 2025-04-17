@@ -2,7 +2,7 @@ use std::sync::{LazyLock, Mutex};
 
 use url::Url;
 
-use crate::protocols::Protocol;
+use crate::handlers::Protocol;
 
 #[derive(Clone, Debug)]
 pub struct HistoryEntry {
