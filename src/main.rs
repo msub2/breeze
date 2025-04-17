@@ -15,7 +15,7 @@ use eframe::egui::{
 use url::Url;
 
 use crate::history::{add_entry, can_go_back, can_go_forward};
-use crate::networking::{fetch, fetch_udp};
+use crate::networking::fetch;
 use crate::protocols::finger::Finger;
 use crate::protocols::gemini::Gemini;
 use crate::protocols::gopher::Gopher;
@@ -135,49 +135,26 @@ impl Breeze {
             return;
         }
 
+        let current_url = self.current_url.to_string();
         let hostname = self.current_url.host_str().expect("Hostname is empty!");
-        let path = self.current_url.path();
+        let mut path = self.current_url.path().to_string();
+        if path.is_empty() {
+            path = "/".to_string();
+        }
+        let query = self.current_url.query().unwrap_or("");
         let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext);
-        let response = match protocol {
-            Protocol::Finger => {
-                let port = self.current_url.port().unwrap_or(79);
-                let selector = path.strip_prefix("/").unwrap_or(path);
-                fetch(hostname, port, selector, false)
-            }
-            Protocol::Gemini => {
-                let port = self.current_url.port().unwrap_or(1965);
-                fetch(hostname, port, self.current_url.as_str(), true)
-            }
-            Protocol::Gopher(ssl) => {
-                let port = self.current_url.port().unwrap_or(70);
-                let selector = &format!("{}\t{}", path, self.current_url.query().unwrap_or(""));
-                fetch(hostname, port, selector, ssl)
-            }
-            Protocol::Guppy => {
-                let port = self.current_url.port().unwrap_or(6775);
-                fetch_udp(hostname, port, self.current_url.as_str(), false)
-            }
-            Protocol::Nex => {
-                let port = self.current_url.port().unwrap_or(1900);
-                fetch(hostname, port, path, false)
-            }
-            Protocol::Scorpion => {
-                let port = self.current_url.port().unwrap_or(1517);
-                let selector = format!("R {}", self.current_url.as_str());
-                fetch(hostname, port, &selector, false)
-            }
-            Protocol::Spartan => {
-                let port = self.current_url.port().unwrap_or(300);
-                let selector = &format!("{} {} {}", hostname, path, 0);
-                fetch(hostname, port, selector, false)
-            }
-            Protocol::TextProtocol => {
-                let port = self.current_url.port().unwrap_or(1961);
-                let selector = self.current_url.as_str();
-                fetch(hostname, port, selector, false)
-            }
+        let (selector, ssl) = match protocol {
+            Protocol::Finger => (path.strip_prefix("/").unwrap_or(&path).to_string(), false),
+            Protocol::Gemini => (current_url, true),
+            Protocol::Gopher(ssl) => (format!("{}\t{}", path, query), ssl),
+            Protocol::Guppy => (current_url, false),
+            Protocol::Nex => (path, false),
+            Protocol::Scorpion => (format!("R {}", current_url), false),
+            Protocol::Spartan => (format!("{} {} {}", hostname, path, 0), false),
+            Protocol::TextProtocol => (current_url, false),
             _ => unreachable!(),
         };
+        let response = fetch(&self.current_url, selector.as_str(), ssl, protocol);
         match response {
             Ok(response) => {
                 println!("{}", response);

@@ -129,7 +129,7 @@ impl GopherLine {
         let user_display_string = components[0].to_string();
         let selector = components[1].to_string();
         let hostname = components[2].to_string();
-        let port = components[3].parse().expect("Invalid port number!");
+        let port = components[3].parse().unwrap_or(0);
         let is_link = !matches!(line_type, "i" | "7");
 
         Self {
@@ -193,7 +193,9 @@ impl ProtocolHandler for Gopher {
                             scheme, line.hostname, port, line.selector, &current_search
                         );
                         breeze.url.set(url.clone());
-                        breeze.navigation_hint.set(Some((url, Protocol::Gopher(false))));
+                        breeze
+                            .navigation_hint
+                            .set(Some((url, Protocol::Gopher(false))));
                     }
                 } else if line.is_link {
                     let link_text = RichText::new(&line.user_display_string)

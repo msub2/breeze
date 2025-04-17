@@ -4,6 +4,9 @@ use std::net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::sync::{LazyLock, Mutex};
 
 use native_tls::TlsConnector;
+use url::Url;
+
+use crate::protocols::Protocol;
 
 #[allow(dead_code)]
 static DNS_CACHE: LazyLock<Mutex<HashMap<String, Vec<SocketAddr>>>> =
@@ -29,10 +32,26 @@ pub fn is_hostname_valid(hostname: &str) -> bool {
     }
 }
 
-pub fn fetch(hostname: &str, port: u16, selector: &str, ssl: bool) -> Result<String, String> {
+pub fn fetch(url: &Url, selector: &str, ssl: bool, protocol: Protocol) -> Result<String, String> {
+    let hostname = url.host_str().expect("Hostname is empty!");
+    let port = url.port().unwrap_or_else(|| match protocol {
+        Protocol::Finger => 79,
+        Protocol::Gemini => 1965,
+        Protocol::Gopher(_) => 70,
+        Protocol::Guppy => 6775,
+        Protocol::Nex => 1900,
+        Protocol::Scorpion => 1517,
+        Protocol::Spartan => 300,
+        Protocol::TextProtocol => 1961,
+        _ => 0,
+    });
     let url = format!("{}:{}", hostname, port);
     let request = format!("{}\r\n", selector);
     let mut buf = String::new();
+
+    if protocol == Protocol::Guppy {
+        return fetch_udp(hostname, port, selector, ssl);
+    }
 
     if ssl {
         let connector = TlsConnector::builder()
@@ -60,7 +79,7 @@ pub fn fetch(hostname: &str, port: u16, selector: &str, ssl: bool) -> Result<Str
     }
 }
 
-pub fn fetch_udp(hostname: &str, port: u16, selector: &str, _ssl: bool) -> Result<String, String> {
+fn fetch_udp(hostname: &str, port: u16, selector: &str, _ssl: bool) -> Result<String, String> {
     let url = format!("{}:{}", hostname, port);
     let request = format!("{}\r\n", selector);
     let mut data = Vec::new();
