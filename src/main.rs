@@ -9,7 +9,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use eframe::egui::{
-    Button, CentralPanel, Context, FontData, FontDefinitions, FontFamily, IconData, Image, Key,
+    Button, CentralPanel, Context, FontData, FontDefinitions, FontFamily, IconData, Key,
     ScrollArea, ViewportBuilder,
 };
 use url::Url;
@@ -44,29 +44,11 @@ fn main() -> eframe::Result {
     // Set up custom fonts needed for rendering
     let mut fonts = FontDefinitions::default();
     // Inconsolata for uniform monospace font
-    fonts.font_data.insert(
-        "Inconsolata".to_owned(),
-        Arc::new(FontData::from_static(include_bytes!(
-            "../res/Inconsolata.ttf"
-        ))),
-    );
-    fonts
-        .families
-        .get_mut(&FontFamily::Monospace)
-        .unwrap()
-        .insert(0, "Inconsolata".to_owned());
+    load_font!(fonts, FontFamily::Monospace, "Inconsolata".to_string(), "../res/Inconsolata.ttf");
     // Segoe UI Symbols for rendering extended Unicode chars
-    fonts.font_data.insert(
-        "SegoeUISymbol".to_owned(),
-        Arc::new(FontData::from_static(include_bytes!(
-            "../res/segoe-ui-symbol.ttf"
-        ))),
-    );
-    fonts
-        .families
-        .get_mut(&FontFamily::Monospace)
-        .unwrap()
-        .push("SegoeUISymbol".to_string());
+    load_font!(fonts, FontFamily::Monospace, "SegoeUISymbol".to_string(), "../res/SegoeUISymbol.ttf");
+    // Yu Gothic for rendering more extended chars in gemtext
+    load_font!(fonts, FontFamily::Proportional, "YuGothic".to_string(), "../res/YuGothic.ttf");
 
     eframe::run_native(
         "Breeze",
@@ -79,6 +61,22 @@ fn main() -> eframe::Result {
             Ok(Box::<Breeze>::new(Breeze::new()))
         }),
     )
+}
+
+#[macro_export]
+macro_rules! load_font {
+    ($fonts:expr, $font_family:expr, $font_name:expr, $font_path:expr) => {
+        $fonts.font_data.insert(
+            $font_name.clone(),
+            Arc::new(FontData::from_static(include_bytes!($font_path)))
+        );
+        
+        $fonts
+            .families
+            .get_mut(&$font_family)
+            .unwrap()
+            .push($font_name);
+    };
 }
 
 #[derive(Default)]
