@@ -1,5 +1,5 @@
 pub mod finger;
-pub mod gemini;
+pub mod gemtext;
 pub mod gopher;
 pub mod nex;
 pub mod plaintext;

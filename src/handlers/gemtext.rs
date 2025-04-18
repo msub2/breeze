@@ -39,30 +39,30 @@ impl LineType {
     }
 }
 
-struct GeminiLine {
+struct GemtextLine {
     line_type: LineType,
     content: String,
     path: Option<String>,
     preformatted: bool,
 }
 
-impl GeminiLine {
-    fn from_str(s: &str, plaintext: bool, gemini: &mut Gemini) -> Self {
+impl GemtextLine {
+    fn from_str(s: &str, plaintext: bool, gemtext: &mut Gemtext) -> Self {
         if plaintext || s.is_empty() {
             // Treat every line as an informational one
             return Self {
                 line_type: LineType::Text,
                 content: s.to_string(),
                 path: None,
-                preformatted: gemini.preformat_line,
+                preformatted: gemtext.preformat_line,
             };
         }
 
         let line_type = LineType::from_str(s);
         if line_type == LineType::PreformatToggle {
-            gemini.preformat_line = !gemini.preformat_line;
+            gemtext.preformat_line = !gemtext.preformat_line;
         }
-        let (content, path) = if gemini.preformat_line && line_type != LineType::PreformatToggle {
+        let (content, path) = if gemtext.preformat_line && line_type != LineType::PreformatToggle {
             (s.to_string(), None)
         } else {
             match line_type {
@@ -85,18 +85,18 @@ impl GeminiLine {
             line_type,
             content,
             path,
-            preformatted: gemini.preformat_line,
+            preformatted: gemtext.preformat_line,
         }
     }
 }
 
 #[derive(Default)]
-pub struct Gemini {
-    current_page_contents: Vec<GeminiLine>,
+pub struct Gemtext {
+    current_page_contents: Vec<GemtextLine>,
     preformat_line: bool,
 }
 
-impl ProtocolHandler for Gemini {
+impl ProtocolHandler for Gemtext {
     fn parse_content(&mut self, response: &str, plaintext: bool) {
         self.preformat_line = false; // Reset preformat flag on new page load
         let Some((_server_code, response)) = response.split_once("\n") else {
@@ -104,8 +104,8 @@ impl ProtocolHandler for Gemini {
         };
         if plaintext {
             let lines: Vec<&str> = response.lines().filter(|line| line != &".").collect();
-            let gemini_line = GeminiLine::from_str(&lines.join("\n"), plaintext, self);
-            self.current_page_contents = vec![gemini_line];
+            let gemtext_line = GemtextLine::from_str(&lines.join("\n"), plaintext, self);
+            self.current_page_contents = vec![gemtext_line];
             return;
         }
         self.current_page_contents = response
@@ -115,7 +115,7 @@ impl ProtocolHandler for Gemini {
                     // EOF
                     None
                 } else {
-                    Some(GeminiLine::from_str(line, plaintext, self))
+                    Some(GemtextLine::from_str(line, plaintext, self))
                 }
             })
             .collect();
@@ -164,14 +164,14 @@ impl ProtocolHandler for Gemini {
                             }
                             if link.clicked() {
                                 let path =
-                                    line.path.clone().expect("Gemini link line without path!");
+                                    line.path.clone().expect("Gemtext link line without path!");
                                 let current_url = breeze.current_url.clone();
                                 let current_url = current_url.join(&path).unwrap();
                                 breeze.url.set(current_url.to_string());
                                 let hint = if path.ends_with(".txt") {
                                     Protocol::Plaintext
                                 } else {
-                                    Protocol::Gemini
+                                    Protocol::from_url(&current_url)
                                 };
                                 breeze
                                     .navigation_hint

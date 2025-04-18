@@ -17,7 +17,7 @@ use poll_promise::Promise;
 use url::Url;
 
 use crate::handlers::finger::Finger;
-use crate::handlers::gemini::Gemini;
+use crate::handlers::gemtext::Gemtext;
 use crate::handlers::gopher::Gopher;
 use crate::handlers::nex::Nex;
 use crate::handlers::plaintext::Plaintext;
@@ -99,7 +99,7 @@ macro_rules! load_font {
 #[derive(Default)]
 struct ContentHandlers {
     finger: Finger,
-    gemtext: Gemini,
+    gemtext: Gemtext,
     gopher: Gopher,
     nex: Nex,
     plaintext: Plaintext,
