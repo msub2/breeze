@@ -119,7 +119,7 @@ impl ProtocolHandler for Gemtext {
     }
 
     fn render_page(&self, ui: &mut Ui, breeze: &Breeze) {
-        ui.style_mut().spacing.item_spacing = Vec2::new(0.0, -2.0);
+        ui.style_mut().spacing.item_spacing = Vec2::new(0.0, -1.0);
         for line in &self.current_page_contents {
             ui.horizontal(|ui| {
                 if line.preformatted && line.line_type != LineType::PreformatToggle {
