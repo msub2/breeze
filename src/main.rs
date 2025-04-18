@@ -289,17 +289,25 @@ impl eframe::App for Breeze {
         let Some(job) = &self.nav_job else { return };
         match job.nav_promise.ready() {
             Some(Ok(response)) => {
-                // TODO: Handle non-success codes
-                if matches!(
-                    response.status,
-                    ServerStatus::Gemini(GeminiStatus::Success) | ServerStatus::Success
-                ) {
-                    println!("{}", response.content);
-                    self.content_handlers.parse_content(
-                        &response.content,
-                        job.plaintext,
-                        job.protocol,
-                    );
+                match &response.status {
+                    ServerStatus::Gemini(GeminiStatus::Success) |
+                    ServerStatus::Success => {
+                        println!("{}", response.content);
+                        self.content_handlers.parse_content(
+                            &response.content,
+                            job.plaintext,
+                            job.protocol,
+                        );
+                    }
+                    ServerStatus::Gemini(GeminiStatus::TemporaryRedirect(url)) |
+                    ServerStatus::Gemini(GeminiStatus::PermanentRedirect(url)) => {
+                        println!("Redirecting to: {}", url);
+                        self.url.set(url.clone());
+                        self.navigation_hint.set(Some((url.clone(), job.protocol)));
+                    }
+                    _ => {
+                        println!("Unhandled status: {:?}", response.status);
+                    }
                 }
                 self.nav_job = None;
             }

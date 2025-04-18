@@ -32,18 +32,20 @@ pub fn is_hostname_valid(hostname: &str) -> bool {
     }
 }
 
+#[derive(Debug)]
 pub enum ServerStatus {
     Gemini(GeminiStatus),
     Spartan,
     Success,
 }
 
+#[derive(Debug)]
 pub enum GeminiStatus {
     InputExpected,
     SensitiveInputExpected,
     Success,
-    TemporaryRedirect,
-    PermanentRedirect,
+    TemporaryRedirect(String),
+    PermanentRedirect(String),
     TemporaryFailure,
     ServerUnavailable,
     CGIError,
@@ -60,13 +62,14 @@ pub enum GeminiStatus {
 }
 
 impl From<&str> for GeminiStatus {
-    fn from(s: &str) -> Self {
-        match s {
+    fn from(status: &str) -> Self {
+        let (code, data) = status.split_once(' ').unwrap();
+        match code {
             "10" => GeminiStatus::InputExpected,
             "11" => GeminiStatus::SensitiveInputExpected,
             "20" => GeminiStatus::Success,
-            "30" => GeminiStatus::TemporaryRedirect,
-            "31" => GeminiStatus::PermanentRedirect,
+            "30" => GeminiStatus::TemporaryRedirect(data.to_string()),
+            "31" => GeminiStatus::PermanentRedirect(data.to_string()),
             "40" => GeminiStatus::TemporaryFailure,
             "41" => GeminiStatus::ServerUnavailable,
             "42" => GeminiStatus::CGIError,
@@ -80,11 +83,12 @@ impl From<&str> for GeminiStatus {
             "60" => GeminiStatus::RequiresClientCertificate,
             "61" => GeminiStatus::CertificateNotAuthorized,
             "62" => GeminiStatus::CertificateNotValid,
-            _ => unreachable!("Unknown Gemini status code: {}", s),
+            _ => unreachable!("Unknown Gemini status code: {}", code),
         }
     }
 }
 
+#[derive(Debug)]
 pub struct ServerResponse {
     pub content: String,
     pub status: ServerStatus,
@@ -199,10 +203,10 @@ fn fetch_udp(
 fn parse_server_response(response: &str, protocol: Protocol) -> ServerResponse {
     match protocol {
         Protocol::Gemini => {
-            let (code, _) = response.split_once(' ').unwrap();
+            let (server_status, content) = response.split_once('\n').unwrap();
             ServerResponse {
-                content: response.to_string(),
-                status: ServerStatus::Gemini(GeminiStatus::from(code)),
+                content: content.to_string(),
+                status: ServerStatus::Gemini(GeminiStatus::from(server_status)),
             }
         }
         _ => ServerResponse {

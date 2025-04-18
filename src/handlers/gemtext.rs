@@ -99,9 +99,6 @@ pub struct Gemtext {
 impl ProtocolHandler for Gemtext {
     fn parse_content(&mut self, response: &str, plaintext: bool) {
         self.preformat_line = false; // Reset preformat flag on new page load
-        let Some((_server_code, response)) = response.split_once("\n") else {
-            return;
-        };
         if plaintext {
             let lines: Vec<&str> = response.lines().filter(|line| line != &".").collect();
             let gemtext_line = GemtextLine::from_str(&lines.join("\n"), plaintext, self);
