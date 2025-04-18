@@ -32,7 +32,70 @@ pub fn is_hostname_valid(hostname: &str) -> bool {
     }
 }
 
-pub fn fetch(url: &Url, selector: &str, ssl: bool, protocol: Protocol) -> Result<String, String> {
+pub enum ServerStatus {
+    Gemini(GeminiStatus),
+    Spartan,
+    Success,
+}
+
+pub enum GeminiStatus {
+    InputExpected,
+    SensitiveInputExpected,
+    Success,
+    TemporaryRedirect,
+    PermanentRedirect,
+    TemporaryFailure,
+    ServerUnavailable,
+    CGIError,
+    ProxyError,
+    SlowDown,
+    PermanentFailure,
+    NotFound,
+    Gone,
+    ProxyRequestRefused,
+    BadRequest,
+    RequiresClientCertificate,
+    CertificateNotAuthorized,
+    CertificateNotValid,
+}
+
+impl From<&str> for GeminiStatus {
+    fn from(s: &str) -> Self {
+        match s {
+            "10" => GeminiStatus::InputExpected,
+            "11" => GeminiStatus::SensitiveInputExpected,
+            "20" => GeminiStatus::Success,
+            "30" => GeminiStatus::TemporaryRedirect,
+            "31" => GeminiStatus::PermanentRedirect,
+            "40" => GeminiStatus::TemporaryFailure,
+            "41" => GeminiStatus::ServerUnavailable,
+            "42" => GeminiStatus::CGIError,
+            "43" => GeminiStatus::ProxyError,
+            "44" => GeminiStatus::SlowDown,
+            "50" => GeminiStatus::PermanentFailure,
+            "51" => GeminiStatus::NotFound,
+            "52" => GeminiStatus::Gone,
+            "53" => GeminiStatus::ProxyRequestRefused,
+            "59" => GeminiStatus::BadRequest,
+            "60" => GeminiStatus::RequiresClientCertificate,
+            "61" => GeminiStatus::CertificateNotAuthorized,
+            "62" => GeminiStatus::CertificateNotValid,
+            _ => unreachable!("Unknown Gemini status code: {}", s),
+        }
+    }
+}
+
+pub struct ServerResponse {
+    pub content: String,
+    pub status: ServerStatus,
+}
+
+pub fn fetch(
+    url: &Url,
+    selector: &str,
+    ssl: bool,
+    protocol: Protocol,
+) -> Result<ServerResponse, String> {
     let hostname = url.host_str().expect("Hostname is empty!");
     let port = url.port().unwrap_or_else(|| match protocol {
         Protocol::Finger => 79,
@@ -66,20 +129,25 @@ pub fn fetch(url: &Url, selector: &str, ssl: bool, protocol: Protocol) -> Result
             .write_all(request.as_bytes())
             .map_err(|e| e.to_string())?;
         stream.read_to_string(&mut buf).map_err(|e| e.to_string())?;
-        Ok(buf)
+        Ok(parse_server_response(&buf, protocol))
     } else if let Ok(mut stream) = TcpStream::connect(url) {
         stream
             .write_all(request.as_bytes())
             .map_err(|e| e.to_string())?;
         stream.read_to_string(&mut buf).map_err(|e| e.to_string())?;
-        Ok(buf)
+        Ok(parse_server_response(&buf, protocol))
     } else {
         buf.push_str(&format!("Failed to connect to hostname: {}", hostname));
         Err(buf)
     }
 }
 
-fn fetch_udp(hostname: &str, port: u16, selector: &str, _ssl: bool) -> Result<String, String> {
+fn fetch_udp(
+    hostname: &str,
+    port: u16,
+    selector: &str,
+    _ssl: bool,
+) -> Result<ServerResponse, String> {
     let url = format!("{}:{}", hostname, port);
     let request = format!("{}\r\n", selector);
     let mut data = Vec::new();
@@ -118,8 +186,28 @@ fn fetch_udp(hostname: &str, port: u16, selector: &str, _ssl: bool) -> Result<St
                 completed = true;
             }
         }
-        Ok(String::from_utf8_lossy(&data).to_string())
+        let response = ServerResponse {
+            content: String::from_utf8_lossy(&data).to_string(),
+            status: ServerStatus::Success,
+        };
+        Ok(response)
     } else {
         Err(format!("Failed to connect to hostname: {}", hostname))
+    }
+}
+
+fn parse_server_response(response: &str, protocol: Protocol) -> ServerResponse {
+    match protocol {
+        Protocol::Gemini => {
+            let (code, _) = response.split_once(' ').unwrap();
+            ServerResponse {
+                content: response.to_string(),
+                status: ServerStatus::Gemini(GeminiStatus::from(code)),
+            }
+        }
+        _ => ServerResponse {
+            content: response.to_string(),
+            status: ServerStatus::Success,
+        },
     }
 }

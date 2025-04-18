@@ -23,7 +23,7 @@ use crate::handlers::nex::Nex;
 use crate::handlers::plaintext::Plaintext;
 use crate::handlers::{Protocol, ProtocolHandler};
 use crate::history::{add_entry, can_go_back, can_go_forward};
-use crate::networking::fetch;
+use crate::networking::{fetch, GeminiStatus, ServerResponse, ServerStatus};
 
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -120,14 +120,14 @@ impl ContentHandlers {
 }
 
 struct NavigationJob {
-    nav_promise: Promise<Result<String, String>>,
+    nav_promise: Promise<Result<ServerResponse, String>>,
     plaintext: bool,
     protocol: Protocol,
 }
 
 impl NavigationJob {
     fn new(
-        nav_promise: Promise<Result<String, String>>,
+        nav_promise: Promise<Result<ServerResponse, String>>,
         plaintext: bool,
         protocol: Protocol,
     ) -> Self {
@@ -279,23 +279,29 @@ impl eframe::App for Breeze {
             self.reset_scroll_pos = true;
         }
 
-        if let Some(job) = &self.nav_job {
-            if let Some(response) = job.nav_promise.ready() {
-                match response {
-                    Ok(response) => {
-                        println!("{}", response);
-                        self.content_handlers
-                            .parse_content(&response, job.plaintext, job.protocol);
-                    }
-                    Err(error) => {
-                        self.content_handlers
-                            .parse_content(&error, true, job.protocol);
-                    }
+        let Some(job) = &self.nav_job else { return };
+        match job.nav_promise.ready() {
+            Some(Ok(response)) => {
+                // TODO: Handle non-success codes
+                if matches!(
+                    response.status,
+                    ServerStatus::Gemini(GeminiStatus::Success) | ServerStatus::Success
+                ) {
+                    println!("{}", response.content);
+                    self.content_handlers.parse_content(
+                        &response.content,
+                        job.plaintext,
+                        job.protocol,
+                    );
                 }
                 self.nav_job = None;
-            } else {
-                ctx.set_cursor_icon(CursorIcon::Wait);
             }
+            Some(Err(error)) => {
+                self.content_handlers
+                    .parse_content(&error, true, job.protocol);
+                self.nav_job = None;
+            }
+            None => ctx.set_cursor_icon(CursorIcon::Wait),
         }
     }
 }
