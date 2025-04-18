@@ -32,30 +32,25 @@ pub fn is_hostname_valid(hostname: &str) -> bool {
     }
 }
 
-#[derive(Debug)]
-pub enum ServerStatus {
-    Gemini(GeminiStatus),
-    Spartan,
-    Success,
-}
+// TODO: Gopher+
 
 #[derive(Debug)]
 pub enum GeminiStatus {
-    InputExpected,
-    SensitiveInputExpected,
-    Success,
+    InputExpected(String),
+    SensitiveInputExpected(String),
+    Success(String),
     TemporaryRedirect(String),
     PermanentRedirect(String),
-    TemporaryFailure,
-    ServerUnavailable,
-    CGIError,
-    ProxyError,
-    SlowDown,
-    PermanentFailure,
-    NotFound,
-    Gone,
-    ProxyRequestRefused,
-    BadRequest,
+    TemporaryFailure(String),
+    ServerUnavailable(String),
+    CGIError(String),
+    ProxyError(String),
+    SlowDown(String),
+    PermanentFailure(String),
+    NotFound(String),
+    Gone(String),
+    ProxyRequestRefused(String),
+    BadRequest(String),
     RequiresClientCertificate,
     CertificateNotAuthorized,
     CertificateNotValid,
@@ -64,28 +59,79 @@ pub enum GeminiStatus {
 impl From<&str> for GeminiStatus {
     fn from(status: &str) -> Self {
         let (code, data) = status.split_once(' ').unwrap();
+        let data = data.to_string();
         match code {
-            "10" => GeminiStatus::InputExpected,
-            "11" => GeminiStatus::SensitiveInputExpected,
-            "20" => GeminiStatus::Success,
-            "30" => GeminiStatus::TemporaryRedirect(data.to_string()),
-            "31" => GeminiStatus::PermanentRedirect(data.to_string()),
-            "40" => GeminiStatus::TemporaryFailure,
-            "41" => GeminiStatus::ServerUnavailable,
-            "42" => GeminiStatus::CGIError,
-            "43" => GeminiStatus::ProxyError,
-            "44" => GeminiStatus::SlowDown,
-            "50" => GeminiStatus::PermanentFailure,
-            "51" => GeminiStatus::NotFound,
-            "52" => GeminiStatus::Gone,
-            "53" => GeminiStatus::ProxyRequestRefused,
-            "59" => GeminiStatus::BadRequest,
+            "10" => GeminiStatus::InputExpected(data),
+            "11" => GeminiStatus::SensitiveInputExpected(data),
+            "20" => GeminiStatus::Success(data),
+            "30" => GeminiStatus::TemporaryRedirect(data),
+            "31" => GeminiStatus::PermanentRedirect(data),
+            "40" => GeminiStatus::TemporaryFailure(data),
+            "41" => GeminiStatus::ServerUnavailable(data),
+            "42" => GeminiStatus::CGIError(data),
+            "43" => GeminiStatus::ProxyError(data),
+            "44" => GeminiStatus::SlowDown(data),
+            "50" => GeminiStatus::PermanentFailure(data),
+            "51" => GeminiStatus::NotFound(data),
+            "52" => GeminiStatus::Gone(data),
+            "53" => GeminiStatus::ProxyRequestRefused(data),
+            "59" => GeminiStatus::BadRequest(data),
             "60" => GeminiStatus::RequiresClientCertificate,
             "61" => GeminiStatus::CertificateNotAuthorized,
             "62" => GeminiStatus::CertificateNotValid,
             _ => unreachable!("Unknown Gemini status code: {}", code),
         }
     }
+}
+
+#[derive(Debug)]
+pub enum SpartanStatus {
+    Success(String),
+    Redirect(String),
+    ClientError(String),
+    ServerError(String),
+}
+
+impl From<&str> for SpartanStatus {
+    fn from(status: &str) -> Self {
+        let (code, data) = status.split_once(' ').unwrap();
+        match code {
+            "2" => SpartanStatus::Success(data.to_string()),
+            "3" => SpartanStatus::Redirect(data.to_string()),
+            "4" => SpartanStatus::ClientError(data.to_string()),
+            "5" => SpartanStatus::ServerError(data.to_string()),
+            _ => unreachable!("Unknown Spartan status code: {}", code),
+        }
+    }
+}
+
+// TODO: Scorpion
+
+#[derive(Debug)]
+pub enum TextProtocolStatus {
+    OK(String),
+    Redirect(String),
+    NOK(String),
+}
+
+impl From<&str> for TextProtocolStatus {
+    fn from(status: &str) -> Self {
+        let (code, data) = status.split_once(' ').unwrap();
+        match code {
+            "20" => TextProtocolStatus::OK(data.to_string()),
+            "30" => TextProtocolStatus::Redirect(data.to_string()),
+            "40" => TextProtocolStatus::NOK(data.to_string()),
+            _ => unreachable!("Unknown Text Protocol status code: {}", code),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ServerStatus {
+    Gemini(GeminiStatus),
+    Spartan(SpartanStatus),
+    TextProtocol(TextProtocolStatus),
+    _Success(String),
 }
 
 #[derive(Debug)]
@@ -190,11 +236,8 @@ fn fetch_udp(
                 completed = true;
             }
         }
-        let response = ServerResponse {
-            content: String::from_utf8_lossy(&data).to_string(),
-            status: ServerStatus::Success,
-        };
-        Ok(response)
+        let response = String::from_utf8_lossy(&data).to_string();
+        Ok(parse_server_response(&response, Protocol::Guppy))
     } else {
         Err(format!("Failed to connect to hostname: {}", hostname))
     }
@@ -209,9 +252,30 @@ fn parse_server_response(response: &str, protocol: Protocol) -> ServerResponse {
                 status: ServerStatus::Gemini(GeminiStatus::from(server_status)),
             }
         }
+        Protocol::Guppy => {
+            let (content_type, content) = response.split_once('\n').unwrap();
+            ServerResponse {
+                content: content.to_string(),
+                status: ServerStatus::_Success(content_type.to_string()),
+            }
+        }
+        Protocol::TextProtocol => {
+            let (server_status, content) = response.split_once('\n').unwrap();
+            ServerResponse {
+                content: content.to_string(),
+                status: ServerStatus::TextProtocol(TextProtocolStatus::from(server_status)),
+            }
+        }
+        Protocol::Spartan => {
+            let (server_status, content) = response.split_once('\n').unwrap();
+            ServerResponse {
+                content: content.to_string(),
+                status: ServerStatus::Spartan(SpartanStatus::from(server_status)),
+            }
+        }
         _ => ServerResponse {
             content: response.to_string(),
-            status: ServerStatus::Success,
+            status: ServerStatus::_Success("text/plain".to_string()),
         },
     }
 }

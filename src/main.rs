@@ -24,7 +24,9 @@ use crate::handlers::nex::Nex;
 use crate::handlers::plaintext::Plaintext;
 use crate::handlers::{Protocol, ProtocolHandler};
 use crate::history::{add_entry, can_go_back, can_go_forward};
-use crate::networking::{fetch, GeminiStatus, ServerResponse, ServerStatus};
+use crate::networking::{
+    fetch, GeminiStatus, ServerResponse, ServerStatus, SpartanStatus, TextProtocolStatus,
+};
 
 #[derive(Parser)]
 struct Args {
@@ -290,20 +292,52 @@ impl eframe::App for Breeze {
         match job.nav_promise.ready() {
             Some(Ok(response)) => {
                 match &response.status {
-                    ServerStatus::Gemini(GeminiStatus::Success) |
-                    ServerStatus::Success => {
-                        println!("{}", response.content);
+                    // Input
+                    ServerStatus::Gemini(GeminiStatus::InputExpected(_data))
+                    | ServerStatus::Gemini(GeminiStatus::SensitiveInputExpected(_data)) => {
+                        todo!()
+                    }
+                    // Success
+                    ServerStatus::Gemini(GeminiStatus::Success(content_type))
+                    | ServerStatus::Spartan(SpartanStatus::Success(content_type))
+                    | ServerStatus::TextProtocol(TextProtocolStatus::OK(content_type))
+                    | ServerStatus::_Success(content_type) => {
+                        println!(
+                            "Content Type: {}\nContent: {}",
+                            content_type, response.content
+                        );
                         self.content_handlers.parse_content(
                             &response.content,
                             job.plaintext,
                             job.protocol,
                         );
                     }
-                    ServerStatus::Gemini(GeminiStatus::TemporaryRedirect(url)) |
-                    ServerStatus::Gemini(GeminiStatus::PermanentRedirect(url)) => {
+                    // Redirect
+                    ServerStatus::Gemini(GeminiStatus::TemporaryRedirect(url))
+                    | ServerStatus::Gemini(GeminiStatus::PermanentRedirect(url))
+                    | ServerStatus::Spartan(SpartanStatus::Redirect(url))
+                    | ServerStatus::TextProtocol(TextProtocolStatus::Redirect(url)) => {
                         println!("Redirecting to: {}", url);
                         self.url.set(url.clone());
                         self.navigation_hint.set(Some((url.clone(), job.protocol)));
+                    }
+                    // Failure
+                    ServerStatus::Gemini(GeminiStatus::TemporaryFailure(data))
+                    | ServerStatus::Gemini(GeminiStatus::ServerUnavailable(data))
+                    | ServerStatus::Gemini(GeminiStatus::CGIError(data))
+                    | ServerStatus::Gemini(GeminiStatus::ProxyError(data))
+                    | ServerStatus::Gemini(GeminiStatus::SlowDown(data))
+                    | ServerStatus::Gemini(GeminiStatus::PermanentFailure(data))
+                    | ServerStatus::Gemini(GeminiStatus::NotFound(data))
+                    | ServerStatus::Gemini(GeminiStatus::Gone(data))
+                    | ServerStatus::Gemini(GeminiStatus::ProxyRequestRefused(data))
+                    | ServerStatus::Gemini(GeminiStatus::BadRequest(data))
+                    | ServerStatus::Spartan(SpartanStatus::ClientError(data))
+                    | ServerStatus::Spartan(SpartanStatus::ServerError(data))
+                    | ServerStatus::TextProtocol(TextProtocolStatus::NOK(data)) => {
+                        let msg = format!("The requested resource could not be found.\n\nAdditional information:\n\n{}", data);
+                        self.content_handlers
+                            .parse_content(&msg, true, job.protocol);
                     }
                     _ => {
                         println!("Unhandled status: {:?}", response.status);
