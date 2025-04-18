@@ -9,6 +9,7 @@ use std::process::exit;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use clap::Parser;
 use eframe::egui::{
     menu, Button, CentralPanel, Context, CursorIcon, FontData, FontDefinitions, FontFamily,
     IconData, Key, ScrollArea, TopBottomPanel, ViewportBuilder,
@@ -25,7 +26,14 @@ use crate::handlers::{Protocol, ProtocolHandler};
 use crate::history::{add_entry, can_go_back, can_go_forward};
 use crate::networking::{fetch, GeminiStatus, ServerResponse, ServerStatus};
 
+#[derive(Parser)]
+struct Args {
+    #[arg(short, long, default_value = "gemini://geminiprotocol.net/")]
+    url: String,
+}
+
 fn main() -> eframe::Result {
+    let args = Args::parse();
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let icon = include_bytes!("../res/breeze32.png");
     let image = image::load_from_memory(icon)
@@ -75,7 +83,7 @@ fn main() -> eframe::Result {
             egui_extras::install_image_loaders(&cc.egui_ctx);
             cc.egui_ctx.set_fonts(fonts);
 
-            Ok(Box::<Breeze>::new(Breeze::new()))
+            Ok(Box::<Breeze>::new(Breeze::new(args.url)))
         }),
     )
 }
@@ -153,9 +161,8 @@ struct Breeze {
 }
 
 impl Breeze {
-    fn new() -> Self {
-        // TODO: Make this configurable
-        let starting_url = Url::from_str("gemini://geminiprotocol.net/").unwrap();
+    fn new(starting_url: String) -> Self {
+        let starting_url = Url::from_str(&starting_url).unwrap();
         Self {
             url: Cell::new(starting_url.to_string()),
             current_url: starting_url.clone(),
