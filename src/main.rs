@@ -1,27 +1,29 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+mod handlers;
 mod history;
 mod networking;
-mod handlers;
 
 use std::cell::Cell;
+use std::process::exit;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use eframe::egui::{
-    Button, CentralPanel, Context, FontData, FontDefinitions, FontFamily, IconData, Key,
-    ScrollArea, ViewportBuilder,
+    menu, Button, CentralPanel, Context, CursorIcon, FontData, FontDefinitions, FontFamily,
+    IconData, Key, ScrollArea, TopBottomPanel, ViewportBuilder,
 };
+use poll_promise::Promise;
 use url::Url;
 
-use crate::history::{add_entry, can_go_back, can_go_forward};
-use crate::networking::fetch;
 use crate::handlers::finger::Finger;
 use crate::handlers::gemini::Gemini;
 use crate::handlers::gopher::Gopher;
 use crate::handlers::nex::Nex;
 use crate::handlers::plaintext::Plaintext;
 use crate::handlers::{Protocol, ProtocolHandler};
+use crate::history::{add_entry, can_go_back, can_go_forward};
+use crate::networking::fetch;
 
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -44,11 +46,26 @@ fn main() -> eframe::Result {
     // Set up custom fonts needed for rendering
     let mut fonts = FontDefinitions::default();
     // Inconsolata for uniform monospace font
-    load_font!(fonts, FontFamily::Monospace, "Inconsolata".to_string(), "../res/Inconsolata.ttf");
+    load_font!(
+        fonts,
+        FontFamily::Monospace,
+        "Inconsolata".to_string(),
+        "../res/Inconsolata.ttf"
+    );
     // Segoe UI Symbols for rendering extended Unicode chars
-    load_font!(fonts, FontFamily::Monospace, "SegoeUISymbol".to_string(), "../res/SegoeUISymbol.ttf");
+    load_font!(
+        fonts,
+        FontFamily::Monospace,
+        "SegoeUISymbol".to_string(),
+        "../res/SegoeUISymbol.ttf"
+    );
     // Yu Gothic for rendering more extended chars in gemtext
-    load_font!(fonts, FontFamily::Proportional, "YuGothic".to_string(), "../res/YuGothic.ttf");
+    load_font!(
+        fonts,
+        FontFamily::Proportional,
+        "YuGothic".to_string(),
+        "../res/YuGothic.ttf"
+    );
 
     eframe::run_native(
         "Breeze",
@@ -68,9 +85,9 @@ macro_rules! load_font {
     ($fonts:expr, $font_family:expr, $font_name:expr, $font_path:expr) => {
         $fonts.font_data.insert(
             $font_name.clone(),
-            Arc::new(FontData::from_static(include_bytes!($font_path)))
+            Arc::new(FontData::from_static(include_bytes!($font_path))),
         );
-        
+
         $fonts
             .families
             .get_mut(&$font_family)
@@ -102,6 +119,26 @@ impl ContentHandlers {
     }
 }
 
+struct NavigationJob {
+    nav_promise: Promise<Result<String, String>>,
+    plaintext: bool,
+    protocol: Protocol,
+}
+
+impl NavigationJob {
+    fn new(
+        nav_promise: Promise<Result<String, String>>,
+        plaintext: bool,
+        protocol: Protocol,
+    ) -> Self {
+        Self {
+            nav_promise,
+            plaintext,
+            protocol,
+        }
+    }
+}
+
 struct Breeze {
     /// The current value of the URL bar
     url: Cell<String>,
@@ -112,11 +149,13 @@ struct Breeze {
     content_handlers: ContentHandlers,
     navigation_hint: Cell<Option<(String, Protocol)>>,
     reset_scroll_pos: bool,
+    nav_job: Option<NavigationJob>,
 }
 
 impl Breeze {
     fn new() -> Self {
-        let starting_url = Url::from_str("scorpion://zzo38computer.org/").unwrap();
+        // TODO: Make this configurable
+        let starting_url = Url::from_str("gemini://geminiprotocol.net/").unwrap();
         Self {
             url: Cell::new(starting_url.to_string()),
             current_url: starting_url.clone(),
@@ -127,6 +166,7 @@ impl Breeze {
                 Protocol::from_url(&starting_url),
             ))),
             reset_scroll_pos: false,
+            nav_job: None,
         }
     }
 
@@ -167,22 +207,25 @@ impl Breeze {
             Protocol::TextProtocol => (current_url, false),
             _ => unreachable!(),
         };
-        let response = fetch(&self.current_url, selector.as_str(), ssl, protocol);
-        match response {
-            Ok(response) => {
-                println!("{}", response);
-                self.content_handlers
-                    .parse_content(&response, plaintext, protocol);
-            }
-            Err(error) => {
-                self.content_handlers.parse_content(&error, true, protocol);
-            }
-        }
+        let url = self.current_url.clone();
+        let promise =
+            Promise::spawn_thread("net", move || fetch(&url, selector.as_str(), ssl, protocol));
+        self.nav_job
+            .replace(NavigationJob::new(promise, plaintext, protocol));
     }
 }
 
 impl eframe::App for Breeze {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+        TopBottomPanel::top("menubar").show(ctx, |ui| {
+            menu::bar(ui, |ui| {
+                ui.menu_button("File", |ui| {
+                    if ui.button("Quit").clicked() {
+                        exit(0);
+                    }
+                });
+            });
+        });
         CentralPanel::default().show(ctx, |ui| {
             // Navigation and address bar
             ui.horizontal(|ui| {
@@ -233,6 +276,25 @@ impl eframe::App for Breeze {
         if let Some((_, protocol)) = self.navigation_hint.take() {
             self.navigate(Some(protocol), true);
             self.reset_scroll_pos = true;
+        }
+
+        if let Some(job) = &self.nav_job {
+            if let Some(response) = job.nav_promise.ready() {
+                match response {
+                    Ok(response) => {
+                        println!("{}", response);
+                        self.content_handlers
+                            .parse_content(&response, job.plaintext, job.protocol);
+                    }
+                    Err(error) => {
+                        self.content_handlers
+                            .parse_content(&error, true, job.protocol);
+                    }
+                }
+                self.nav_job = None;
+            } else {
+                ctx.set_cursor_icon(CursorIcon::Wait);
+            }
         }
     }
 }

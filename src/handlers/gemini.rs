@@ -71,7 +71,7 @@ impl GeminiLine {
                     match content.split_once(char::is_whitespace) {
                         Some((path, display_string)) => {
                             (display_string.trim().to_string(), Some(path.to_string()))
-                        },
+                        }
                         None => (content.clone(), Some(content)),
                     }
                 }
