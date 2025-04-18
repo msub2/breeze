@@ -217,6 +217,7 @@ impl Breeze {
 
 impl eframe::App for Breeze {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+        ctx.request_repaint();
         TopBottomPanel::top("menubar").show(ctx, |ui| {
             menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
