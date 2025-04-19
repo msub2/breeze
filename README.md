@@ -37,8 +37,8 @@ Below are the following protocols that Breeze should ideally be able to speak. "
   - [ ] Usable
 - Scorpion
   - [x] Usable
-    - Proper document rendering not yet implemented
-  - [ ] Navigable
+    - Document rendering WIP
+  - [x] Navigable
 - Text Protocol
   - [x] Usable
   - [ ] Navigable
