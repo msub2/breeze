@@ -36,8 +36,7 @@ pub fn is_hostname_valid(hostname: &str) -> bool {
 
 #[derive(Debug)]
 pub enum GeminiStatus {
-    InputExpected(String),
-    SensitiveInputExpected(String),
+    InputExpected(String, bool),
     Success(String),
     TemporaryRedirect(String),
     PermanentRedirect(String),
@@ -61,8 +60,8 @@ impl From<&str> for GeminiStatus {
         let (code, data) = status.split_once(' ').unwrap();
         let data = data.to_string();
         match code {
-            "10" => GeminiStatus::InputExpected(data),
-            "11" => GeminiStatus::SensitiveInputExpected(data),
+            "10" => GeminiStatus::InputExpected(data, false),
+            "11" => GeminiStatus::InputExpected(data, true),
             "20" => GeminiStatus::Success(data),
             "30" => GeminiStatus::TemporaryRedirect(data),
             "31" => GeminiStatus::PermanentRedirect(data),

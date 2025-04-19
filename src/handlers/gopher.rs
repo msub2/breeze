@@ -3,7 +3,7 @@ use std::cell::Cell;
 use eframe::egui::{self, Color32, Label, RichText, TextEdit, Ui};
 use url::Url;
 
-use crate::Breeze;
+use crate::{Breeze, NavigationHint};
 
 use super::{Protocol, ProtocolHandler};
 
@@ -193,9 +193,11 @@ impl ProtocolHandler for Gopher {
                             scheme, line.hostname, port, line.selector, &current_search
                         );
                         breeze.url.set(url.clone());
-                        breeze
-                            .navigation_hint
-                            .set(Some((url, Protocol::Gopher(false))));
+                        breeze.navigation_hint.set(Some(NavigationHint {
+                            url,
+                            protocol: Protocol::Gopher(false),
+                            add_to_history: true,
+                        }));
                     }
                 } else if line.is_link {
                     let link_text = RichText::new(&line.user_display_string)
@@ -225,7 +227,11 @@ impl ProtocolHandler for Gopher {
                         } else {
                             Protocol::from_url(&Url::parse(&url).unwrap())
                         };
-                        breeze.navigation_hint.set(Some((url, hint)));
+                        breeze.navigation_hint.set(Some(NavigationHint {
+                            url,
+                            protocol: hint,
+                            add_to_history: true,
+                        }));
                     }
                 } else {
                     let text = RichText::new(&line.user_display_string).size(14.0);

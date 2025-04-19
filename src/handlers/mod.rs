@@ -24,7 +24,11 @@ pub enum Protocol {
 
 impl Protocol {
     pub fn from_url(url: &Url) -> Protocol {
-        match url.scheme() {
+        Protocol::from_str(url.scheme())
+    }
+
+    pub fn from_str(s: &str) -> Protocol {
+        match s.split(':').next().unwrap() {
             "finger" => Protocol::Finger,
             "gemini" => Protocol::Gemini,
             "gopher" => Protocol::Gopher(false),

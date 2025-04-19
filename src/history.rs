@@ -35,6 +35,16 @@ pub fn add_entry(url: Url, protocol: Protocol) {
     }
 }
 
+pub fn remove_entry(index: usize) -> HistoryEntry {
+    let mut history = HISTORY.lock().unwrap();
+    history.remove(index)
+}
+
+pub fn remove_latest_entry() -> HistoryEntry {
+    let mut history = HISTORY.lock().unwrap();
+    history.pop().unwrap()
+}
+
 pub fn back() -> Option<HistoryEntry> {
     let history = HISTORY.lock().unwrap();
     let mut index = HISTORY_INDEX.lock().unwrap();

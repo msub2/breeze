@@ -1,6 +1,6 @@
 use eframe::egui::{self, Color32, Label, RichText, Ui, Vec2};
 
-use crate::Breeze;
+use crate::{Breeze, NavigationHint};
 
 use super::{Protocol, ProtocolHandler};
 
@@ -170,9 +170,11 @@ impl ProtocolHandler for Gemtext {
                                 } else {
                                     Protocol::from_url(&current_url)
                                 };
-                                breeze
-                                    .navigation_hint
-                                    .set(Some((current_url.to_string(), hint)));
+                                breeze.navigation_hint.set(Some(NavigationHint {
+                                    url: current_url.to_string(),
+                                    protocol: hint,
+                                    add_to_history: true,
+                                }));
                             }
                         }
                         LineType::Quote => {

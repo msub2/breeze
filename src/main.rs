@@ -12,7 +12,7 @@ use std::sync::Arc;
 use clap::Parser;
 use eframe::egui::{
     menu, Button, CentralPanel, Context, CursorIcon, FontData, FontDefinitions, FontFamily,
-    IconData, Key, ScrollArea, TopBottomPanel, ViewportBuilder,
+    IconData, Key, Modal, ScrollArea, TextEdit, TopBottomPanel, ViewportBuilder,
 };
 use poll_promise::Promise;
 use url::Url;
@@ -129,6 +129,12 @@ impl ContentHandlers {
     }
 }
 
+struct NavigationHint {
+    pub url: String,
+    pub protocol: Protocol,
+    pub add_to_history: bool,
+}
+
 struct NavigationJob {
     nav_promise: Promise<Result<ServerResponse, String>>,
     plaintext: bool,
@@ -149,6 +155,13 @@ impl NavigationJob {
     }
 }
 
+struct InputRequest {
+    pub prompt: String,
+    pub sensitive: bool,
+    pub destination: String,
+    pub user_input: String,
+}
+
 struct Breeze {
     /// The current value of the URL bar
     url: Cell<String>,
@@ -157,9 +170,10 @@ struct Breeze {
     /// The plaintext response from the server for this page
     page_content: String,
     content_handlers: ContentHandlers,
-    navigation_hint: Cell<Option<(String, Protocol)>>,
+    navigation_hint: Cell<Option<NavigationHint>>,
     reset_scroll_pos: bool,
     nav_job: Option<NavigationJob>,
+    input_request: Option<InputRequest>,
 }
 
 impl Breeze {
@@ -170,17 +184,20 @@ impl Breeze {
             current_url: starting_url.clone(),
             page_content: "".to_string(),
             content_handlers: Default::default(),
-            navigation_hint: Cell::new(Some((
-                starting_url.to_string(),
-                Protocol::from_url(&starting_url),
-            ))),
+            navigation_hint: Cell::new(Some(NavigationHint {
+                url: starting_url.to_string(),
+                protocol: Protocol::from_url(&starting_url),
+                add_to_history: true,
+            })),
             reset_scroll_pos: false,
             nav_job: None,
+            input_request: None,
         }
     }
 
     // Validate URL before updating the currently active page content
     fn navigate(&mut self, protocol_hint: Option<Protocol>, should_add_entry: bool) {
+        self.input_request = None;
         if should_add_entry {
             println!("{}", self.url.get_mut());
             let protocol = protocol_hint.unwrap_or(Protocol::from_url(&self.current_url));
@@ -281,10 +298,29 @@ impl eframe::App for Breeze {
                     _ => self.content_handlers.plaintext.render_page(ui, self),
                 }
             });
+
+            if let Some(input_request) = &mut self.input_request {
+                Modal::new("input".into()).show(ctx, |ui| {
+                    ui.label(input_request.prompt.as_str());
+                    let text_edit = TextEdit::singleline(&mut input_request.user_input)
+                        .password(input_request.sensitive);
+                    ui.add(text_edit);
+                    if ui.button("Submit").clicked() {
+                        let url =
+                            format!("{}?{}", input_request.destination, input_request.user_input);
+                        self.navigation_hint.set(Some(NavigationHint {
+                            url,
+                            protocol: Protocol::from_str(&input_request.destination),
+                            add_to_history: true,
+                        }));
+                    }
+                });
+            }
         });
 
-        if let Some((_, protocol)) = self.navigation_hint.take() {
-            self.navigate(Some(protocol), true);
+        if let Some(hint) = self.navigation_hint.take() {
+            self.url.set(hint.url);
+            self.navigate(Some(hint.protocol), hint.add_to_history);
             self.reset_scroll_pos = true;
         }
 
@@ -293,9 +329,14 @@ impl eframe::App for Breeze {
             Some(Ok(response)) => {
                 match &response.status {
                     // Input
-                    ServerStatus::Gemini(GeminiStatus::InputExpected(_data))
-                    | ServerStatus::Gemini(GeminiStatus::SensitiveInputExpected(_data)) => {
-                        todo!()
+                    ServerStatus::Gemini(GeminiStatus::InputExpected(prompt, sensitive)) => {
+                        history::remove_latest_entry();
+                        self.input_request = Some(InputRequest {
+                            prompt: prompt.clone(),
+                            sensitive: *sensitive,
+                            destination: self.current_url.to_string(),
+                            user_input: "".to_string(),
+                        });
                     }
                     // Success
                     ServerStatus::Gemini(GeminiStatus::Success(content_type))
@@ -319,7 +360,11 @@ impl eframe::App for Breeze {
                     | ServerStatus::TextProtocol(TextProtocolStatus::Redirect(url)) => {
                         println!("Redirecting to: {}", url);
                         self.url.set(url.clone());
-                        self.navigation_hint.set(Some((url.clone(), job.protocol)));
+                        self.navigation_hint.set(Some(NavigationHint {
+                            url: url.clone(),
+                            protocol: job.protocol,
+                            add_to_history: true,
+                        }));
                     }
                     // Failure
                     ServerStatus::Gemini(GeminiStatus::TemporaryFailure(data))

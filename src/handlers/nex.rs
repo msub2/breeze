@@ -1,6 +1,6 @@
 use eframe::egui::{self, Color32, Label, RichText, Ui};
 
-use crate::Breeze;
+use crate::{Breeze, NavigationHint};
 
 use super::{Protocol, ProtocolHandler};
 
@@ -50,7 +50,11 @@ impl ProtocolHandler for Nex {
                         let current_url = breeze.current_url.join(url).unwrap();
                         let url = current_url.to_string();
                         breeze.url.set(url.clone());
-                        breeze.navigation_hint.set(Some((url, Protocol::Nex)));
+                        breeze.navigation_hint.set(Some(NavigationHint {
+                            url,
+                            protocol: Protocol::Nex,
+                            add_to_history: true,
+                        }));
                     }
                 });
             } else {
