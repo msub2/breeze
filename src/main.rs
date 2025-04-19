@@ -288,6 +288,7 @@ impl eframe::App for Breeze {
                 self.reset_scroll_pos = false;
             }
             scroll_area.show(ui, |ui| {
+                // TODO: This should eventually check content type instead of protocol
                 let protocol = Protocol::from_url(&self.current_url);
                 match protocol {
                     Protocol::Finger => self.content_handlers.finger.render_page(ui, self),
@@ -295,6 +296,7 @@ impl eframe::App for Breeze {
                         self.content_handlers.gemtext.render_page(ui, self);
                     }
                     Protocol::Gopher(_) => self.content_handlers.gopher.render_page(ui, self),
+                    Protocol::Nex => self.content_handlers.nex.render_page(ui, self),
                     _ => self.content_handlers.plaintext.render_page(ui, self),
                 }
             });
