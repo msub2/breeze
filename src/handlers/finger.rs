@@ -19,7 +19,8 @@ impl Default for Finger {
 }
 
 impl ProtocolHandler for Finger {
-    fn parse_content(&mut self, response: &str, _: bool) {
+    fn parse_content(&mut self, response: &[u8], _: bool) {
+        let response = String::from_utf8_lossy(response);
         self.current_page_contents = response.to_string();
     }
 

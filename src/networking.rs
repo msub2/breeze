@@ -3,6 +3,7 @@ use std::io::{BufRead, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::sync::{LazyLock, Mutex};
 
+use eframe::egui::TextBuffer;
 use native_tls::TlsConnector;
 use url::Url;
 
@@ -104,7 +105,78 @@ impl From<&str> for SpartanStatus {
     }
 }
 
-// TODO: Scorpion
+#[derive(Debug)]
+pub enum ScorpionStatus {
+    Interactive,
+    InputRequired,
+    OK,
+    PartialOK,
+    TemporaryRedirect,
+    PermanentRedirect,
+    TemporaryError,
+    DownForMaintenance,
+    DynamicFileError,
+    ProxyError,
+    SlowDown,
+    TemporarilyLockedFile,
+    PermanentError(String),
+    FileNotFound(String),
+    FileRemoved(String),
+    ProxyRequestRefused,
+    Forbidden,
+    EditConflict,
+    CredentialsRequired,
+    BadRequest,
+    RequiresClientCertificate,
+    CertificateNotAuthorized,
+    CertificateNotValid,
+    ReadyNewFile,
+    ReadyModifyFile,
+    ReadyOther,
+    AcceptedNewFile,
+    AcceptedFileModified,
+    AcceptedOther,
+}
+
+impl From<&str> for ScorpionStatus {
+    fn from(status: &str) -> Self {
+        // TODO: Handle additional data with codes
+        let (code, data) = status.split_once(' ').unwrap();
+        let data = data.to_string();
+        match code {
+            "00" => ScorpionStatus::Interactive,
+            "10" => ScorpionStatus::InputRequired,
+            "20" => ScorpionStatus::OK,
+            "21" => ScorpionStatus::PartialOK,
+            "30" => ScorpionStatus::TemporaryRedirect,
+            "31" => ScorpionStatus::PermanentRedirect,
+            "40" => ScorpionStatus::TemporaryError,
+            "41" => ScorpionStatus::DownForMaintenance,
+            "42" => ScorpionStatus::DynamicFileError,
+            "43" => ScorpionStatus::ProxyError,
+            "44" => ScorpionStatus::SlowDown,
+            "45" => ScorpionStatus::TemporarilyLockedFile,
+            "50" => ScorpionStatus::PermanentError(data),
+            "51" => ScorpionStatus::FileNotFound(data),
+            "52" => ScorpionStatus::FileRemoved(data),
+            "53" => ScorpionStatus::ProxyRequestRefused,
+            "54" => ScorpionStatus::Forbidden,
+            "55" => ScorpionStatus::EditConflict,
+            "56" => ScorpionStatus::CredentialsRequired,
+            "59" => ScorpionStatus::BadRequest,
+            "60" => ScorpionStatus::RequiresClientCertificate,
+            "61" => ScorpionStatus::CertificateNotAuthorized,
+            "62" => ScorpionStatus::CertificateNotValid,
+            "70" => ScorpionStatus::ReadyNewFile,
+            "71" => ScorpionStatus::ReadyModifyFile,
+            "72" => ScorpionStatus::ReadyOther,
+            "80" => ScorpionStatus::AcceptedNewFile,
+            "81" => ScorpionStatus::AcceptedFileModified,
+            "82" => ScorpionStatus::AcceptedOther,
+            _ => unreachable!("Unknown Scorpion status code: {}", status),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum TextProtocolStatus {
@@ -128,6 +200,7 @@ impl From<&str> for TextProtocolStatus {
 #[derive(Debug)]
 pub enum ServerStatus {
     Gemini(GeminiStatus),
+    Scorpion(ScorpionStatus),
     Spartan(SpartanStatus),
     TextProtocol(TextProtocolStatus),
     _Success(String),
@@ -135,7 +208,7 @@ pub enum ServerStatus {
 
 #[derive(Debug)]
 pub struct ServerResponse {
-    pub content: String,
+    pub content: Vec<u8>,
     pub status: ServerStatus,
 }
 
@@ -159,7 +232,7 @@ pub fn fetch(
     });
     let url = format!("{}:{}", hostname, port);
     let request = format!("{}\r\n", selector);
-    let mut buf = String::new();
+    let mut buf = Vec::new();
 
     if protocol == Protocol::Guppy {
         return fetch_udp(hostname, port, selector, ssl);
@@ -177,17 +250,17 @@ pub fn fetch(
         stream
             .write_all(request.as_bytes())
             .map_err(|e| e.to_string())?;
-        stream.read_to_string(&mut buf).map_err(|e| e.to_string())?;
+        stream.read_to_end(&mut buf).map_err(|e| e.to_string())?;
         Ok(parse_server_response(&buf, protocol))
     } else if let Ok(mut stream) = TcpStream::connect(url) {
         stream
             .write_all(request.as_bytes())
             .map_err(|e| e.to_string())?;
-        stream.read_to_string(&mut buf).map_err(|e| e.to_string())?;
+        stream.read_to_end(&mut buf).map_err(|e| e.to_string())?;
         Ok(parse_server_response(&buf, protocol))
     } else {
-        buf.push_str(&format!("Failed to connect to hostname: {}", hostname));
-        Err(buf)
+        let msg = format!("Failed to connect to hostname: {}", hostname);
+        Err(msg)
     }
 }
 
@@ -235,45 +308,63 @@ fn fetch_udp(
                 completed = true;
             }
         }
-        let response = String::from_utf8_lossy(&data).to_string();
-        Ok(parse_server_response(&response, Protocol::Guppy))
+        Ok(parse_server_response(&data, Protocol::Guppy))
     } else {
         Err(format!("Failed to connect to hostname: {}", hostname))
     }
 }
 
-fn parse_server_response(response: &str, protocol: Protocol) -> ServerResponse {
+fn parse_server_response(response: &[u8], protocol: Protocol) -> ServerResponse {
     match protocol {
         Protocol::Gemini => {
+            let response = String::from_utf8_lossy(response);
             let (server_status, content) = response.split_once('\n').unwrap();
             ServerResponse {
-                content: content.to_string(),
+                content: Vec::from(content),
                 status: ServerStatus::Gemini(GeminiStatus::from(server_status)),
             }
         }
         Protocol::Guppy => {
+            let response = String::from_utf8_lossy(response);
             let (content_type, content) = response.split_once('\n').unwrap();
             ServerResponse {
-                content: content.to_string(),
+                content: Vec::from(content),
                 status: ServerStatus::_Success(content_type.to_string()),
             }
         }
         Protocol::TextProtocol => {
+            let response = String::from_utf8_lossy(response);
             let (server_status, content) = response.split_once('\n').unwrap();
             ServerResponse {
-                content: content.to_string(),
+                content: Vec::from(content),
                 status: ServerStatus::TextProtocol(TextProtocolStatus::from(server_status)),
             }
         }
+        Protocol::Scorpion => {
+            // Get status line from server response
+            let status_end = response.iter().position(|b| *b == b'\n').unwrap();
+            let status_line_bytes = &response[0..status_end];
+            let content_bytes = &response[status_end + 1..];
+            let status_line = String::from_utf8_lossy(status_line_bytes);
+
+            // Parse status line
+            let status = ScorpionStatus::from(status_line.as_str());
+
+            ServerResponse {
+                content: Vec::from(content_bytes),
+                status: ServerStatus::Scorpion(status),
+            }
+        }
         Protocol::Spartan => {
+            let response = String::from_utf8_lossy(response);
             let (server_status, content) = response.split_once('\n').unwrap();
             ServerResponse {
-                content: content.to_string(),
+                content: Vec::from(content),
                 status: ServerStatus::Spartan(SpartanStatus::from(server_status)),
             }
         }
         _ => ServerResponse {
-            content: response.to_string(),
+            content: response.to_owned(),
             status: ServerStatus::_Success("text/plain".to_string()),
         },
     }

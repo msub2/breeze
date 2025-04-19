@@ -22,10 +22,12 @@ use crate::handlers::gemtext::Gemtext;
 use crate::handlers::gopher::Gopher;
 use crate::handlers::nex::Nex;
 use crate::handlers::plaintext::Plaintext;
+use crate::handlers::scorpion::Scorpion;
 use crate::handlers::{Protocol, ProtocolHandler};
 use crate::history::{add_entry, can_go_back, can_go_forward};
 use crate::networking::{
-    fetch, GeminiStatus, ServerResponse, ServerStatus, SpartanStatus, TextProtocolStatus,
+    fetch, GeminiStatus, ScorpionStatus, ServerResponse, ServerStatus, SpartanStatus,
+    TextProtocolStatus,
 };
 
 #[derive(Parser)]
@@ -112,11 +114,12 @@ struct ContentHandlers {
     gemtext: Gemtext,
     gopher: Gopher,
     nex: Nex,
+    scorpion: Scorpion,
     plaintext: Plaintext,
 }
 
 impl ContentHandlers {
-    pub fn parse_content(&mut self, response: &str, plaintext: bool, protocol: Protocol) {
+    pub fn parse_content(&mut self, response: &[u8], plaintext: bool, protocol: Protocol) {
         match protocol {
             Protocol::Finger => self.finger.parse_content(response, plaintext),
             Protocol::Gemini | Protocol::Spartan | Protocol::Guppy => {
@@ -124,6 +127,7 @@ impl ContentHandlers {
             }
             Protocol::Gopher(_) => self.gopher.parse_content(response, plaintext),
             Protocol::Nex => self.nex.parse_content(response, plaintext),
+            Protocol::Scorpion => self.scorpion.parse_content(response, plaintext),
             _ => self.plaintext.parse_content(response, plaintext),
         }
     }
@@ -221,7 +225,8 @@ impl Breeze {
         } else {
             ""
         };
-        let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext);
+        let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext)
+            || current_url.ends_with(".txt");
         let (selector, ssl) = match protocol {
             Protocol::Finger => (path.strip_prefix("/").unwrap_or(&path).to_string(), false),
             Protocol::Gemini => (current_url, true),
@@ -297,6 +302,7 @@ impl eframe::App for Breeze {
                     }
                     Protocol::Gopher(_) => self.content_handlers.gopher.render_page(ui, self),
                     Protocol::Nex => self.content_handlers.nex.render_page(ui, self),
+                    Protocol::Scorpion => self.content_handlers.scorpion.render_page(ui, self),
                     _ => self.content_handlers.plaintext.render_page(ui, self),
                 }
             });
@@ -329,6 +335,8 @@ impl eframe::App for Breeze {
         let Some(job) = &self.nav_job else { return };
         match job.nav_promise.ready() {
             Some(Ok(response)) => {
+                // TODO: This feels like it's getting very verbose,
+                // see if there's a way to better work with these statuses
                 match &response.status {
                     // Input
                     ServerStatus::Gemini(GeminiStatus::InputExpected(prompt, sensitive)) => {
@@ -341,14 +349,17 @@ impl eframe::App for Breeze {
                         });
                     }
                     // Success
-                    ServerStatus::Gemini(GeminiStatus::Success(content_type))
-                    | ServerStatus::Spartan(SpartanStatus::Success(content_type))
-                    | ServerStatus::TextProtocol(TextProtocolStatus::OK(content_type))
-                    | ServerStatus::_Success(content_type) => {
-                        println!(
-                            "Content Type: {}\nContent: {}",
-                            content_type, response.content
+                    ServerStatus::Gemini(GeminiStatus::Success(_content_type))
+                    | ServerStatus::Spartan(SpartanStatus::Success(_content_type))
+                    | ServerStatus::TextProtocol(TextProtocolStatus::OK(_content_type))
+                    | ServerStatus::_Success(_content_type) => {
+                        self.content_handlers.parse_content(
+                            &response.content,
+                            job.plaintext,
+                            job.protocol,
                         );
+                    }
+                    ServerStatus::Scorpion(ScorpionStatus::OK) => {
                         self.content_handlers.parse_content(
                             &response.content,
                             job.plaintext,
@@ -379,12 +390,15 @@ impl eframe::App for Breeze {
                     | ServerStatus::Gemini(GeminiStatus::Gone(data))
                     | ServerStatus::Gemini(GeminiStatus::ProxyRequestRefused(data))
                     | ServerStatus::Gemini(GeminiStatus::BadRequest(data))
+                    | ServerStatus::Scorpion(ScorpionStatus::PermanentError(data))
+                    | ServerStatus::Scorpion(ScorpionStatus::FileNotFound(data))
+                    | ServerStatus::Scorpion(ScorpionStatus::FileRemoved(data))
                     | ServerStatus::Spartan(SpartanStatus::ClientError(data))
                     | ServerStatus::Spartan(SpartanStatus::ServerError(data))
                     | ServerStatus::TextProtocol(TextProtocolStatus::NOK(data)) => {
                         let msg = format!("The requested resource could not be found.\n\nAdditional information:\n\n{}", data);
                         self.content_handlers
-                            .parse_content(&msg, true, job.protocol);
+                            .parse_content(&msg.as_bytes(), true, job.protocol);
                     }
                     _ => {
                         println!("Unhandled status: {:?}", response.status);
@@ -394,7 +408,7 @@ impl eframe::App for Breeze {
             }
             Some(Err(error)) => {
                 self.content_handlers
-                    .parse_content(&error, true, job.protocol);
+                    .parse_content(&error.as_bytes(), true, job.protocol);
                 self.nav_job = None;
             }
             None => ctx.set_cursor_icon(CursorIcon::Wait),

@@ -97,7 +97,8 @@ pub struct Gemtext {
 }
 
 impl ProtocolHandler for Gemtext {
-    fn parse_content(&mut self, response: &str, plaintext: bool) {
+    fn parse_content(&mut self, response: &[u8], plaintext: bool) {
+        let response = String::from_utf8_lossy(response);
         self.preformat_line = false; // Reset preformat flag on new page load
         if plaintext {
             let lines: Vec<&str> = response.lines().filter(|line| line != &".").collect();

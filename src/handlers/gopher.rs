@@ -150,7 +150,8 @@ pub struct Gopher {
 }
 
 impl ProtocolHandler for Gopher {
-    fn parse_content(&mut self, response: &str, plaintext: bool) {
+    fn parse_content(&mut self, response: &[u8], plaintext: bool) {
+        let response = String::from_utf8_lossy(response);
         if plaintext {
             let lines: Vec<&str> = response.lines().filter(|line| line != &".").collect();
             let gopher_line = GopherLine::from_str(&lines.join("\n"), plaintext);

@@ -24,9 +24,10 @@ pub struct Nex {
 }
 
 impl ProtocolHandler for Nex {
-    fn parse_content(&mut self, response: &str, plaintext: bool) {
+    fn parse_content(&mut self, response: &[u8], plaintext: bool) {
+        let response = String::from_utf8_lossy(response);
         if plaintext {
-            self.current_page_contents = vec![NexLine::from_str(response)];
+            self.current_page_contents = vec![NexLine::from_str(&response)];
         } else {
             self.current_page_contents = response.lines().map(NexLine::from_str).collect();
         }

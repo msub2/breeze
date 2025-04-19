@@ -3,6 +3,7 @@ pub mod gemtext;
 pub mod gopher;
 pub mod nex;
 pub mod plaintext;
+pub mod scorpion;
 
 use eframe::egui;
 use url::Url;
@@ -45,6 +46,6 @@ impl Protocol {
 
 pub trait ProtocolHandler {
     // Parses server text response updates internal page representation
-    fn parse_content(&mut self, response: &str, plaintext: bool);
+    fn parse_content(&mut self, response: &[u8], plaintext: bool);
     fn render_page(&self, ui: &mut egui::Ui, breeze: &super::Breeze);
 }
