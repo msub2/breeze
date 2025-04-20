@@ -35,6 +35,8 @@ pub fn add_entry(url: Url, protocol: Protocol) {
     }
 }
 
+// Silencing lint since I plan to allow more fine-grained history handling at some point
+#[allow(dead_code)]
 pub fn remove_entry(index: usize) -> HistoryEntry {
     let mut history = HISTORY.lock().unwrap();
     history.remove(index)

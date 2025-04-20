@@ -178,6 +178,7 @@ impl From<&str> for ScorpionStatus {
     }
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub enum TextProtocolStatus {
     OK(String),
@@ -219,7 +220,7 @@ pub fn fetch(
     protocol: Protocol,
 ) -> Result<ServerResponse, String> {
     let hostname = url.host_str().expect("Hostname is empty!");
-    let port = url.port().unwrap_or_else(|| match protocol {
+    let port = url.port().unwrap_or(match protocol {
         Protocol::Finger => 79,
         Protocol::Gemini => 1965,
         Protocol::Gopher(_) => 70,

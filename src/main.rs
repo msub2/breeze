@@ -392,7 +392,7 @@ impl eframe::App for Breeze {
                     | ServerStatus::TextProtocol(TextProtocolStatus::NOK(data)) => {
                         let msg = format!("The requested resource could not be found.\n\nAdditional information:\n\n{}", data);
                         self.content_handlers
-                            .parse_content(&msg.as_bytes(), true, job.protocol);
+                            .parse_content(msg.as_bytes(), true, job.protocol);
                     }
                     _ => {
                         println!("Unhandled status: {:?}", response.status);
@@ -402,7 +402,7 @@ impl eframe::App for Breeze {
             }
             Some(Err(error)) => {
                 self.content_handlers
-                    .parse_content(&error.as_bytes(), true, job.protocol);
+                    .parse_content(error.as_bytes(), true, job.protocol);
                 self.nav_job = None;
             }
             None => ctx.set_cursor_icon(CursorIcon::Wait),
