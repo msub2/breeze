@@ -226,6 +226,7 @@ pub fn fetch(
         Protocol::Guppy => 6775,
         Protocol::Nex => 1900,
         Protocol::Scorpion => 1517,
+        Protocol::Scroll => 5699,
         Protocol::Spartan => 300,
         Protocol::TextProtocol => 1961,
         _ => 0,

@@ -115,7 +115,7 @@ impl ContentHandlers {
     pub fn parse_content(&mut self, response: &[u8], plaintext: bool, protocol: Protocol) {
         match protocol {
             Protocol::Finger => self.finger.parse_content(response, plaintext),
-            Protocol::Gemini | Protocol::Spartan | Protocol::Guppy => {
+            Protocol::Gemini | Protocol::Spartan | Protocol::Guppy | Protocol::Scroll => {
                 self.gemtext.parse_content(response, plaintext)
             }
             Protocol::Gopher(_) => self.gopher.parse_content(response, plaintext),
@@ -227,6 +227,7 @@ impl Breeze {
             Protocol::Guppy => (current_url, false),
             Protocol::Nex => (path, false),
             Protocol::Scorpion => (format!("R {}", current_url), false),
+            Protocol::Scroll => (format!("{} {}", current_url, "en"), true),
             Protocol::Spartan => (format!("{} {} {}", hostname, path, 0), false),
             Protocol::TextProtocol => (current_url, false),
             _ => unreachable!(),
@@ -290,7 +291,7 @@ impl eframe::App for Breeze {
                 let protocol = Protocol::from_url(&self.current_url);
                 match protocol {
                     Protocol::Finger => self.content_handlers.finger.render_page(ui, self),
-                    Protocol::Gemini | Protocol::Spartan | Protocol::Guppy => {
+                    Protocol::Gemini | Protocol::Spartan | Protocol::Guppy | Protocol::Scroll => {
                         self.content_handlers.gemtext.render_page(ui, self);
                     }
                     Protocol::Gopher(_) => self.content_handlers.gopher.render_page(ui, self),
