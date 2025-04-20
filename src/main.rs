@@ -12,7 +12,7 @@ use std::sync::Arc;
 use clap::Parser;
 use eframe::egui::{
     menu, Button, CentralPanel, Context, CursorIcon, FontData, FontDefinitions, FontFamily,
-    IconData, Key, Modal, ScrollArea, TextEdit, TopBottomPanel, ViewportBuilder,
+    IconData, Key, Modal, PointerButton, ScrollArea, TextEdit, TopBottomPanel, ViewportBuilder,
 };
 use poll_promise::Promise;
 use url::Url;
@@ -255,7 +255,9 @@ impl eframe::App for Breeze {
         CentralPanel::default().show(ctx, |ui| {
             // Navigation and address bar
             ui.horizontal(|ui| {
-                if ui.add_enabled(can_go_back(), Button::new("Back")).clicked() {
+                if ui.add_enabled(can_go_back(), Button::new("Back")).clicked()
+                    || ui.input(|input| input.pointer.button_clicked(PointerButton::Extra1))
+                {
                     if let Some(entry) = history::back() {
                         self.url.set(entry.url.to_string());
                         self.navigate(Some(entry.protocol), false);
@@ -264,6 +266,7 @@ impl eframe::App for Breeze {
                 if ui
                     .add_enabled(can_go_forward(), Button::new("Forward"))
                     .clicked()
+                    || ui.input(|input| input.pointer.button_clicked(PointerButton::Extra2))
                 {
                     if let Some(entry) = history::forward() {
                         self.url.set(entry.url.to_string());
