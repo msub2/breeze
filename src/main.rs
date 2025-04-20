@@ -57,26 +57,19 @@ fn main() -> eframe::Result {
 
     // Set up custom fonts needed for rendering
     let mut fonts = FontDefinitions::default();
-    // Inconsolata for uniform monospace font
+    // UnifontEX for uniform monospace pan-unicode font
     load_font!(
         fonts,
         FontFamily::Monospace,
-        "Inconsolata".to_string(),
-        "../res/Inconsolata.ttf"
+        "UnifontEx".to_string(),
+        "../res/UnifontExMono.ttf"
     );
-    // Segoe UI Symbols for rendering extended Unicode chars
-    load_font!(
-        fonts,
-        FontFamily::Monospace,
-        "SegoeUISymbol".to_string(),
-        "../res/SegoeUISymbol.ttf"
-    );
-    // Yu Gothic for rendering more extended chars in gemtext
+    // Code2000 for proportional pan-unicode font
     load_font!(
         fonts,
         FontFamily::Proportional,
-        "YuGothic".to_string(),
-        "../res/YuGothic.ttf"
+        "CODE2000".to_string(),
+        "../res/CODE2000.ttf"
     );
 
     eframe::run_native(
