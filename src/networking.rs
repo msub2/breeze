@@ -280,12 +280,12 @@ fn fetch_udp(
         socket.connect(addrs.first().unwrap()).unwrap();
         socket.send(request.as_bytes()).map_err(|e| e.to_string())?;
         while !completed {
+            // This code is all Guppy-specific, as it's the only protocol using UDP instead of TCP
             let mut buf = [0; 16384];
             socket.recv(buf.as_mut()).map_err(|e| e.to_string())?;
             let first_line = buf.lines().next().unwrap().unwrap();
             let server_info = first_line.split(' ').collect::<Vec<_>>();
             if let Some(content_type) = server_info.get(1) {
-                // TODO: This is a hack, need to properly respond to server codes when needed
                 data.extend_from_slice(format!("{}\n", content_type).as_bytes());
             }
             if let Some(seq) = server_info.first() {
