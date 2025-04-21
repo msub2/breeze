@@ -1,4 +1,4 @@
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 
 use url::Url;
 
@@ -20,8 +20,8 @@ static HISTORY: LazyLock<Mutex<Vec<HistoryEntry>>> = LazyLock::new(|| Mutex::new
 static HISTORY_INDEX: LazyLock<Mutex<usize>> = LazyLock::new(|| Mutex::new(0));
 
 pub fn add_entry(url: Url, protocol: Protocol) {
-    let mut history = HISTORY.lock().unwrap();
-    let mut index = HISTORY_INDEX.lock().unwrap();
+    let mut history = history();
+    let mut index = index();
 
     // If we're not at the end, truncate the forward history
     if *index + 1 < history.len() {
@@ -38,18 +38,18 @@ pub fn add_entry(url: Url, protocol: Protocol) {
 // Silencing lint since I plan to allow more fine-grained history handling at some point
 #[allow(dead_code)]
 pub fn remove_entry(index: usize) -> HistoryEntry {
-    let mut history = HISTORY.lock().unwrap();
+    let mut history = history();
     history.remove(index)
 }
 
 pub fn remove_latest_entry() -> HistoryEntry {
-    let mut history = HISTORY.lock().unwrap();
+    let mut history = history();
     history.pop().unwrap()
 }
 
 pub fn back() -> Option<HistoryEntry> {
-    let history = HISTORY.lock().unwrap();
-    let mut index = HISTORY_INDEX.lock().unwrap();
+    let history = history();
+    let mut index = index();
     if *index > 0 {
         *index -= 1;
         history.get(*index).cloned()
@@ -59,8 +59,8 @@ pub fn back() -> Option<HistoryEntry> {
 }
 
 pub fn forward() -> Option<HistoryEntry> {
-    let history = HISTORY.lock().unwrap();
-    let mut index = HISTORY_INDEX.lock().unwrap();
+    let history = history();
+    let mut index = index();
     if *index + 1 < history.len() {
         *index += 1;
         history.get(*index).cloned()
@@ -70,11 +70,19 @@ pub fn forward() -> Option<HistoryEntry> {
 }
 
 pub fn can_go_forward() -> bool {
-    let index = HISTORY_INDEX.lock().unwrap();
-    *index + 1 < HISTORY.lock().unwrap().len()
+    let index = index();
+    *index + 1 < history().len()
 }
 
 pub fn can_go_back() -> bool {
-    let index = HISTORY_INDEX.lock().unwrap();
+    let index = index();
     *index > 0
+}
+
+fn history() -> MutexGuard<'static, Vec<HistoryEntry>> {
+    HISTORY.lock().expect("Failed to lock history mutex")
+}
+
+fn index() -> MutexGuard<'static, usize> {
+    HISTORY_INDEX.lock().expect("Failed to lock history index mutex")
 }
