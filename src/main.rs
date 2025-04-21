@@ -11,8 +11,9 @@ use std::sync::Arc;
 
 use clap::Parser;
 use eframe::egui::{
-    menu, Button, CentralPanel, Context, CursorIcon, FontData, FontDefinitions, FontFamily,
-    IconData, Key, Modal, PointerButton, ScrollArea, TextEdit, TopBottomPanel, ViewportBuilder,
+    menu, Align, Button, CentralPanel, Context, CursorIcon, FontData, FontDefinitions, FontFamily,
+    IconData, Key, Layout, Modal, PointerButton, ScrollArea, Separator, TextEdit, TopBottomPanel,
+    ViewportBuilder,
 };
 use poll_promise::Promise;
 use url::Url;
@@ -273,15 +274,22 @@ impl eframe::App for Breeze {
                         self.navigate(Some(entry.protocol), false);
                     }
                 }
-                let url = ui.text_edit_singleline(self.url.get_mut());
-                if url.lost_focus() && ui.input(|input| input.key_pressed(Key::Enter)) {
-                    self.navigate(None, true);
-                }
-                if ui.button("Go").clicked() {
-                    self.navigate(None, true);
-                }
+                // Layout trick to have address bar render last and fill available remaining space
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.button("Go").clicked() {
+                        self.navigate(None, true);
+                    }
+                    let url = ui.add_sized(
+                        ui.available_size(),
+                        TextEdit::singleline(self.url.get_mut()),
+                    );
+                    if url.lost_focus() && ui.input(|input| input.key_pressed(Key::Enter)) {
+                        self.navigate(None, true);
+                    }
+                });
             });
-            ui.separator();
+            // Extend separator out a bit to match menubar separator
+            ui.add(Separator::default().grow(8.0));
 
             // Page content
             let mut scroll_area = ScrollArea::both().auto_shrink(false);
