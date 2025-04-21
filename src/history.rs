@@ -84,5 +84,7 @@ fn history() -> MutexGuard<'static, Vec<HistoryEntry>> {
 }
 
 fn index() -> MutexGuard<'static, usize> {
-    HISTORY_INDEX.lock().expect("Failed to lock history index mutex")
+    HISTORY_INDEX
+        .lock()
+        .expect("Failed to lock history index mutex")
 }

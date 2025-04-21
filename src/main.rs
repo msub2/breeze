@@ -7,13 +7,14 @@ mod networking;
 use std::cell::Cell;
 use std::process::exit;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use clap::Parser;
 use eframe::egui::{
-    menu, Align, Button, CentralPanel, Context, CursorIcon, FontData, FontDefinitions, FontFamily,
-    IconData, Key, Layout, Modal, PointerButton, ScrollArea, Separator, TextEdit, TopBottomPanel,
-    ViewportBuilder,
+    include_image, menu, Align, Button, CentralPanel, Context, CursorIcon, FontData,
+    FontDefinitions, FontFamily, IconData, Image, Key, Label, Layout, Modal, PointerButton,
+    RichText, ScrollArea, Separator, TextEdit, TopBottomPanel, ViewportBuilder, ViewportId,
 };
 use poll_promise::Promise;
 use url::Url;
@@ -172,6 +173,7 @@ struct Breeze {
     reset_scroll_pos: bool,
     nav_job: Option<NavigationJob>,
     input_request: Option<InputRequest>,
+    show_about_window: Arc<AtomicBool>,
 }
 
 impl Breeze {
@@ -190,6 +192,7 @@ impl Breeze {
             reset_scroll_pos: false,
             nav_job: None,
             input_request: None,
+            show_about_window: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -251,6 +254,11 @@ impl eframe::App for Breeze {
                         exit(0);
                     }
                 });
+                ui.menu_button("Help", |ui| {
+                    if ui.button("About Breeze").clicked() {
+                        self.show_about_window.store(true, Ordering::Relaxed);
+                    }
+                })
             });
         });
         CentralPanel::default().show(ctx, |ui| {
@@ -330,6 +338,32 @@ impl eframe::App for Breeze {
                 });
             }
         });
+
+        if self.show_about_window.load(Ordering::Relaxed) {
+            let show_about_window = self.show_about_window.clone();
+            ctx.show_viewport_deferred(
+                ViewportId::from_hash_of("about"),
+                ViewportBuilder::default()
+                    .with_title("About")
+                    .with_inner_size([640.0, 480.0]),
+                move |ctx, _| {
+                    CentralPanel::default().show(ctx, |ui| {
+                        ui.vertical_centered(|ui| {
+                            ui.add(
+                                Image::new(include_image!("../res/breeze.png"))
+                                    .max_size([200.0, 200.0].into()),
+                            );
+                            ui.add(Label::new(RichText::new("Breeze").size(24.0)));
+                            ui.label("Version: 0.0.1-alpha");
+                        });
+                    });
+
+                    if ctx.input(|i| i.viewport().close_requested()) {
+                        show_about_window.store(false, Ordering::Relaxed);
+                    }
+                },
+            );
+        }
 
         if let Some(hint) = self.navigation_hint.take() {
             self.url.set(hint.url);
