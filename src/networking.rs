@@ -246,8 +246,11 @@ pub fn fetch(
             .build()
             .unwrap();
 
-        let stream = TcpStream::connect(format!("{}:{}", hostname, port)).unwrap();
-        let mut stream = connector.connect(hostname, stream).unwrap();
+        let stream =
+            TcpStream::connect(format!("{}:{}", hostname, port)).map_err(|e| e.to_string())?;
+        let mut stream = connector
+            .connect(hostname, stream)
+            .map_err(|e| e.to_string())?;
 
         stream
             .write_all(request.as_bytes())
