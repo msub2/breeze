@@ -177,6 +177,11 @@ impl ProtocolHandler for Gemtext {
                             let link = ui.add(Label::new(link_text).sense(egui::Sense::hover()));
                             if link.hovered() {
                                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                let path =
+                                    line.path.clone().expect("Gemtext link line without path!");
+                                let current_url = breeze.current_url.clone();
+                                let current_url = current_url.join(&path).unwrap();
+                                *breeze.status_text.borrow_mut() = current_url.to_string();
                             }
                             if link.clicked() {
                                 let path =

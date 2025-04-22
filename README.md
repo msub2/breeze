@@ -32,7 +32,7 @@ Below are the following protocols that Breeze should ideally be able to speak. "
 - Spartan
   - [x] Usable
   - [x] Navigable
-  - [ ] Gemtext Additions
+  - [x] Gemtext Additions
 - Titan
   - [ ] Usable
 - Scorpion
