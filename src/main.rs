@@ -243,7 +243,14 @@ impl Breeze {
             Protocol::Nex => (path, false),
             Protocol::Scorpion => (format!("R {}", current_url), false),
             Protocol::Scroll => (format!("{} {}", current_url, "en"), true),
-            Protocol::Spartan => (format!("{} {} {}", hostname, path, 0), false),
+            Protocol::Spartan => {
+                let query = if let Some(q) = self.current_url.query() {
+                    &format!("{}\n{}", q.len(), q)
+                } else {
+                    "0"
+                };
+                (format!("{} {} {}", hostname, path, query), false)
+            },
             Protocol::TextProtocol => (current_url, false),
             _ => unreachable!(),
         };

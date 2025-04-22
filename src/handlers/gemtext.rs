@@ -1,4 +1,6 @@
-use eframe::egui::{self, Color32, Label, RichText, Ui, Vec2};
+use std::cell::Cell;
+
+use eframe::egui::{self, Color32, Label, RichText, TextEdit, Ui, Vec2};
 
 use crate::{Breeze, NavigationHint};
 
@@ -15,6 +17,8 @@ enum LineType {
     List,
     Quote,
     PreformatToggle,
+    // Spartan Additions
+    Prompt,
 }
 
 impl LineType {
@@ -33,6 +37,8 @@ impl LineType {
             LineType::PreformatToggle
         } else if s.starts_with("*") {
             LineType::List
+        } else if s.starts_with("=:") {
+            LineType::Prompt
         } else {
             LineType::Text
         }
@@ -44,6 +50,7 @@ struct GemtextLine {
     content: String,
     path: Option<String>,
     preformatted: bool,
+    prompt_string: Cell<String>,
 }
 
 impl GemtextLine {
@@ -55,6 +62,7 @@ impl GemtextLine {
                 content: s.to_string(),
                 path: None,
                 preformatted: gemtext.preformat_line,
+                prompt_string: Cell::new("".to_string()),
             };
         }
 
@@ -77,6 +85,15 @@ impl GemtextLine {
                 }
                 LineType::Text => (s.to_string(), None),
                 LineType::PreformatToggle => ("".to_string(), None),
+                LineType::Prompt => {
+                    let content = s[2..].trim().to_string();
+                    match content.split_once(char::is_whitespace) {
+                        Some((path, display_string)) => {
+                            (display_string.trim().to_string(), Some(path.to_string()))
+                        }
+                        None => (content.clone(), Some(content)),
+                    }
+                }
                 _ => (s.to_string(), None),
             }
         };
@@ -86,6 +103,7 @@ impl GemtextLine {
             content,
             path,
             preformatted: gemtext.preformat_line,
+            prompt_string: Cell::new("".to_string()),
         }
     }
 }
@@ -188,7 +206,30 @@ impl ProtocolHandler for Gemtext {
                             let content = line.content.replace("*", "•");
                             ui.label(RichText::new(content).size(14.0));
                         }
-                        LineType::PreformatToggle => {}
+                        LineType::PreformatToggle => {},
+                        LineType::Prompt => {
+                            let mut current_prompt = line.prompt_string.take();
+                            ui.add(TextEdit::singleline(&mut current_prompt));
+                            line.prompt_string.replace(current_prompt.clone());
+                            if ui.button("Submit").clicked() {
+                                let path =
+                                    line.path.clone().expect("Gemtext link line without path!");
+                                let current_url = breeze.current_url.clone();
+                                let mut current_url = current_url.join(&path).unwrap();
+                                current_url.set_query(Some(&current_prompt));
+                                breeze.url.set(current_url.to_string());
+                                let hint = if path.ends_with(".txt") {
+                                    Protocol::Plaintext
+                                } else {
+                                    Protocol::from_url(&current_url)
+                                };
+                                breeze.navigation_hint.set(Some(NavigationHint {
+                                    url: current_url.to_string(),
+                                    protocol: hint,
+                                    add_to_history: true,
+                                }));
+                            }
+                        }
                     }
                 }
             });
