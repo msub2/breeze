@@ -143,13 +143,13 @@ impl ProtocolHandler for Gemtext {
             ui.horizontal(|ui| {
                 if line.preformatted && line.line_type != LineType::PreformatToggle {
                     let mut padded_text = line.content.clone();
-                    let padding_needed = 80_usize.saturating_sub(padded_text.len());
+                    let padding_needed = 120_usize.saturating_sub(padded_text.len());
                     padded_text.push_str(&" ".repeat(padding_needed));
                     let text = RichText::new(&padded_text)
                         .background_color(Color32::LIGHT_GRAY)
                         .monospace()
                         .size(14.0);
-                    ui.add_sized([80.0, 16.0], egui::Label::new(text).extend());
+                    ui.add_sized([120.0, 16.0], egui::Label::new(text).extend());
                 } else {
                     match line.line_type {
                         LineType::Text => {
@@ -174,20 +174,17 @@ impl ProtocolHandler for Gemtext {
                                 .color(Color32::BLUE)
                                 .underline()
                                 .size(14.0);
+                            let path =
+                                line.path.clone().expect("Gemtext link line without path!");
+                            let current_url = breeze.current_url.clone();
+                            let current_url = current_url.join(&path).unwrap();
+
                             let link = ui.add(Label::new(link_text).sense(egui::Sense::hover()));
                             if link.hovered() {
                                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                                let path =
-                                    line.path.clone().expect("Gemtext link line without path!");
-                                let current_url = breeze.current_url.clone();
-                                let current_url = current_url.join(&path).unwrap();
                                 *breeze.status_text.borrow_mut() = current_url.to_string();
                             }
                             if link.clicked() {
-                                let path =
-                                    line.path.clone().expect("Gemtext link line without path!");
-                                let current_url = breeze.current_url.clone();
-                                let current_url = current_url.join(&path).unwrap();
                                 breeze.url.set(current_url.to_string());
                                 let hint = if path.ends_with(".txt") {
                                     Protocol::Plaintext
