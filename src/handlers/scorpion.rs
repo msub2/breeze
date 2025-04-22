@@ -74,6 +74,7 @@ struct Block {
     block_type: BlockType,
     attribute_data: String,
     body_data: String,
+    plaintext: bool,
 }
 
 #[derive(Default)]
@@ -156,6 +157,7 @@ impl ProtocolHandler for Scorpion {
                 block_type: BlockType::Paragraph,
                 attribute_data: String::new(),
                 body_data: String::from_utf8_lossy(response).to_string(),
+                plaintext: true,
             };
             self.current_page_contents = vec![block];
             return;
@@ -186,6 +188,7 @@ impl ProtocolHandler for Scorpion {
                 block_type,
                 attribute_data: String::from_utf8_lossy(&attribute_data).to_string(),
                 body_data: self.parse_body_data(character_encoding, &body_data),
+                plaintext: false,
             });
         }
 
@@ -196,6 +199,9 @@ impl ProtocolHandler for Scorpion {
         self.current_page_contents
             .iter()
             .for_each(|block| match block.block_type {
+                _ if block.plaintext => {
+                    ui.monospace(&block.body_data);
+                }
                 BlockType::Paragraph => {
                     let text = RichText::new(&block.body_data).size(14.0);
                     ui.label(text);
@@ -224,16 +230,18 @@ impl ProtocolHandler for Scorpion {
                         .underline()
                         .monospace()
                         .size(14.0);
+                    let current_url = breeze.current_url.clone();
+                    let mut url = current_url.join(&block.attribute_data).unwrap().to_string();
+                    if block.attribute_data.contains("://") {
+                        url = block.attribute_data.clone();
+                    }
+
                     let link = ui.add(Label::new(link_text).sense(Sense::hover()));
                     if link.hovered() {
                         ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+                        *breeze.status_text.borrow_mut() = url.clone();
                     }
                     if link.clicked() {
-                        let current_url = breeze.current_url.clone();
-                        let mut url = current_url.join(&block.attribute_data).unwrap().to_string();
-                        if block.attribute_data.contains("://") {
-                            url = block.attribute_data.clone();
-                        }
                         breeze.url.set(url.clone());
                         let hint = if url.ends_with(".txt") {
                             Protocol::Plaintext
@@ -246,6 +254,10 @@ impl ProtocolHandler for Scorpion {
                             add_to_history: true,
                         }));
                     }
+                }
+                BlockType::Preformatted => {
+                    let text = RichText::new(&block.body_data).size(14.0);
+                    ui.code(text);
                 }
                 _ => {}
             });
