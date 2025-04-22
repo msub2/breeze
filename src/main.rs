@@ -4,7 +4,7 @@ mod handlers;
 mod history;
 mod networking;
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::process::exit;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,7 +14,7 @@ use clap::Parser;
 use eframe::egui::{
     include_image, menu, Align, Button, CentralPanel, Context, CursorIcon, FontData,
     FontDefinitions, FontFamily, IconData, Image, Key, Label, Layout, Modal, PointerButton,
-    RichText, ScrollArea, Separator, TextEdit, TopBottomPanel, ViewportBuilder, ViewportId,
+    RichText, ScrollArea, Separator, TextEdit, TopBottomPanel, ViewportBuilder, ViewportId, Ui, TextStyle,
 };
 use poll_promise::Promise;
 use url::Url;
@@ -161,6 +161,13 @@ struct InputRequest {
     pub user_input: String,
 }
 
+enum ActiveView {
+    Browser,
+    Mail,
+    Chat,
+    Composer,
+}
+
 struct Breeze {
     /// The current value of the URL bar
     url: Cell<String>,
@@ -174,6 +181,8 @@ struct Breeze {
     nav_job: Option<NavigationJob>,
     input_request: Option<InputRequest>,
     show_about_window: Arc<AtomicBool>,
+    status_text: RefCell<String>,
+    active_view: ActiveView,
 }
 
 impl Breeze {
@@ -193,6 +202,8 @@ impl Breeze {
             nav_job: None,
             input_request: None,
             show_about_window: Arc::new(AtomicBool::new(false)),
+            status_text: RefCell::new("".to_string()),
+            active_view: ActiveView::Browser,
         }
     }
 
@@ -261,82 +272,33 @@ impl eframe::App for Breeze {
                 })
             });
         });
-        CentralPanel::default().show(ctx, |ui| {
-            // Navigation and address bar
+        TopBottomPanel::bottom("statusbar").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                if ui.add_enabled(can_go_back(), Button::new("Back")).clicked()
-                    || ui.input(|input| input.pointer.button_clicked(PointerButton::Extra1))
-                {
-                    if let Some(entry) = history::back() {
-                        self.url.set(entry.url.to_string());
-                        self.navigate(Some(entry.protocol), false);
-                    }
+                if ui.button("Browser").clicked() {
+                    self.active_view = ActiveView::Browser;
                 }
-                if ui
-                    .add_enabled(can_go_forward(), Button::new("Forward"))
-                    .clicked()
-                    || ui.input(|input| input.pointer.button_clicked(PointerButton::Extra2))
-                {
-                    if let Some(entry) = history::forward() {
-                        self.url.set(entry.url.to_string());
-                        self.navigate(Some(entry.protocol), false);
-                    }
+                if ui.button("Mail").clicked() {
+                    self.active_view = ActiveView::Mail;
                 }
-                // Layout trick to have address bar render last and fill available remaining space
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.button("Go").clicked() {
-                        self.navigate(None, true);
-                    }
-                    let url = ui.add_sized(
-                        ui.available_size(),
-                        TextEdit::singleline(self.url.get_mut()),
-                    );
-                    if url.lost_focus() && ui.input(|input| input.key_pressed(Key::Enter)) {
-                        self.navigate(None, true);
-                    }
-                });
+                if ui.button("Chat").clicked() {
+                    self.active_view = ActiveView::Chat;
+                }
+                if ui.button("Composer").clicked() {
+                    self.active_view = ActiveView::Composer;
+                }
+                ui.separator();
+                ui.add_sized(
+                    ui.available_size(),
+                    Label::new(self.status_text.borrow().clone()),
+                );
             });
-            // Extend separator out a bit to match menubar separator
-            ui.add(Separator::default().grow(8.0));
-
-            // Page content
-            let mut scroll_area = ScrollArea::both().auto_shrink(false);
-            if self.reset_scroll_pos {
-                scroll_area = scroll_area.scroll_offset([0.0, 0.0].into());
-                self.reset_scroll_pos = false;
-            }
-            scroll_area.show(ui, |ui| {
-                // TODO: This should eventually check content type instead of protocol
-                let protocol = Protocol::from_url(&self.current_url);
-                match protocol {
-                    Protocol::Finger => self.content_handlers.finger.render_page(ui, self),
-                    Protocol::Gemini | Protocol::Spartan | Protocol::Guppy | Protocol::Scroll => {
-                        self.content_handlers.gemtext.render_page(ui, self);
-                    }
-                    Protocol::Gopher(_) => self.content_handlers.gopher.render_page(ui, self),
-                    Protocol::Nex => self.content_handlers.nex.render_page(ui, self),
-                    Protocol::Scorpion => self.content_handlers.scorpion.render_page(ui, self),
-                    _ => self.content_handlers.plaintext.render_page(ui, self),
-                }
-            });
-
-            if let Some(input_request) = &mut self.input_request {
-                Modal::new("input".into()).show(ctx, |ui| {
-                    ui.label(input_request.prompt.as_str());
-                    let text_edit = TextEdit::singleline(&mut input_request.user_input)
-                        .password(input_request.sensitive);
-                    ui.add(text_edit);
-                    if ui.button("Submit").clicked() {
-                        let url =
-                            format!("{}?{}", input_request.destination, input_request.user_input);
-                        self.navigation_hint.set(Some(NavigationHint {
-                            url,
-                            protocol: Protocol::from_str(&input_request.destination),
-                            add_to_history: true,
-                        }));
-                    }
-                });
-            }
+        });
+        self.status_text.borrow_mut().clear();
+        CentralPanel::default().show(ctx, |ui| match self.active_view {
+            ActiveView::Browser => render_browser(ui, ctx, self),
+            ActiveView::Mail => render_mail(ui, ctx, self),
+            ActiveView::Chat => render_chat(ui, ctx, self),
+            ActiveView::Composer => render_composer(ui, ctx, self),
         });
 
         if self.show_about_window.load(Ordering::Relaxed) {
@@ -376,6 +338,7 @@ impl eframe::App for Breeze {
             Some(Ok(response)) => {
                 // TODO: This feels like it's getting very verbose,
                 // see if there's a way to better work with these statuses
+                self.page_content = String::from_utf8_lossy(&response.content).to_string();
                 match &response.status {
                     // Input
                     ServerStatus::Gemini(GeminiStatus::InputExpected(prompt, sensitive)) => {
@@ -453,4 +416,91 @@ impl eframe::App for Breeze {
             None => ctx.set_cursor_icon(CursorIcon::Wait),
         }
     }
+}
+
+fn render_browser(ui: &mut eframe::egui::Ui, ctx: &Context, breeze: &mut Breeze) {
+    // Navigation and address bar
+    ui.horizontal(|ui| {
+        if ui.add_enabled(can_go_back(), Button::new("←")).clicked()
+            || ui.input(|input| input.pointer.button_clicked(PointerButton::Extra1))
+        {
+            if let Some(entry) = history::back() {
+                breeze.url.set(entry.url.to_string());
+                breeze.navigate(Some(entry.protocol), false);
+            }
+        }
+        if ui.add_enabled(can_go_forward(), Button::new("→")).clicked()
+            || ui.input(|input| input.pointer.button_clicked(PointerButton::Extra2))
+        {
+            if let Some(entry) = history::forward() {
+                breeze.url.set(entry.url.to_string());
+                breeze.navigate(Some(entry.protocol), false);
+            }
+        }
+        // Layout trick to have address bar render last and fill available remaining space
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            if ui.button("Go").clicked() {
+                breeze.navigate(None, true);
+            }
+            let url = ui.add_sized(
+                ui.available_size(),
+                TextEdit::singleline(breeze.url.get_mut()),
+            );
+            if url.lost_focus() && ui.input(|input| input.key_pressed(Key::Enter)) {
+                breeze.navigate(None, true);
+            }
+        });
+    });
+    // Extend separator out a bit to match menubar separator
+    ui.add(Separator::default().grow(8.0));
+
+    // Page content
+    let mut scroll_area = ScrollArea::both().auto_shrink(false);
+    if breeze.reset_scroll_pos {
+        scroll_area = scroll_area.scroll_offset([0.0, 0.0].into());
+        breeze.reset_scroll_pos = false;
+    }
+    scroll_area.show(ui, |ui| {
+        // TODO: This should eventually check content type instead of protocol
+        let protocol = Protocol::from_url(&breeze.current_url);
+        match protocol {
+            Protocol::Finger => breeze.content_handlers.finger.render_page(ui, breeze),
+            Protocol::Gemini | Protocol::Spartan | Protocol::Guppy | Protocol::Scroll => {
+                breeze.content_handlers.gemtext.render_page(ui, breeze);
+            }
+            Protocol::Gopher(_) => breeze.content_handlers.gopher.render_page(ui, breeze),
+            Protocol::Nex => breeze.content_handlers.nex.render_page(ui, breeze),
+            Protocol::Scorpion => breeze.content_handlers.scorpion.render_page(ui, breeze),
+            _ => breeze.content_handlers.plaintext.render_page(ui, breeze),
+        }
+    });
+
+    if let Some(input_request) = &mut breeze.input_request {
+        Modal::new("input".into()).show(ctx, |ui| {
+            ui.label(input_request.prompt.as_str());
+            let text_edit = TextEdit::singleline(&mut input_request.user_input)
+                .password(input_request.sensitive);
+            ui.add(text_edit);
+            if ui.button("Submit").clicked() {
+                let url = format!("{}?{}", input_request.destination, input_request.user_input);
+                breeze.navigation_hint.set(Some(NavigationHint {
+                    url,
+                    protocol: Protocol::from_str(&input_request.destination),
+                    add_to_history: true,
+                }));
+            }
+        });
+    }
+}
+
+fn render_mail(ui: &mut Ui, _ctx: &Context, _breeze: &mut Breeze) {
+    ui.label("This is a placeholder for the mail tab, which will act as a client for Misfin and the NPS.");
+}
+
+fn render_chat(ui: &mut Ui, _ctx: &Context, _breeze: &mut Breeze) {
+    ui.label("This is a placeholder for the chat tab, which will feature a built-in IRC client.");
+}
+
+fn render_composer(ui: &mut Ui, _ctx: &Context, _breeze: &mut Breeze) {
+    ui.label("This is a placeholder for the composer tab, which will allow users to compose Gemtext, Gophermaps, and so on.");
 }
