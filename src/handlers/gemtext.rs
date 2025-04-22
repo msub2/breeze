@@ -145,10 +145,7 @@ impl ProtocolHandler for Gemtext {
                     let mut padded_text = line.content.clone();
                     let padding_needed = 120_usize.saturating_sub(padded_text.len());
                     padded_text.push_str(&" ".repeat(padding_needed));
-                    let text = RichText::new(&padded_text)
-                        .background_color(Color32::LIGHT_GRAY)
-                        .monospace()
-                        .size(14.0);
+                    let text = RichText::new(&padded_text).code().size(14.0);
                     ui.add_sized([120.0, 16.0], egui::Label::new(text).extend());
                 } else {
                     match line.line_type {
@@ -174,8 +171,7 @@ impl ProtocolHandler for Gemtext {
                                 .color(Color32::BLUE)
                                 .underline()
                                 .size(14.0);
-                            let path =
-                                line.path.clone().expect("Gemtext link line without path!");
+                            let path = line.path.clone().expect("Gemtext link line without path!");
                             let current_url = breeze.current_url.clone();
                             let current_url = current_url.join(&path).unwrap();
 
@@ -208,7 +204,7 @@ impl ProtocolHandler for Gemtext {
                             let content = line.content.replace("*", "•");
                             ui.label(RichText::new(content).size(14.0));
                         }
-                        LineType::PreformatToggle => {},
+                        LineType::PreformatToggle => {}
                         LineType::Prompt => {
                             let mut current_prompt = line.prompt_string.take();
                             ui.add(TextEdit::singleline(&mut current_prompt));

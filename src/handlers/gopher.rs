@@ -206,19 +206,21 @@ impl ProtocolHandler for Gopher {
                         .underline()
                         .monospace()
                         .size(14.0);
+                    let port = if line.port != 70 {
+                        format!(":{}", line.port)
+                    } else {
+                        "".to_string()
+                    };
+                    let scheme = breeze.current_url.scheme();
+                    let mut url =
+                        format!("{}://{}{}{}", scheme, line.hostname, port, line.selector);
+
                     let link = ui.add(Label::new(link_text).sense(egui::Sense::hover()));
                     if link.hovered() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        *breeze.status_text.borrow_mut() = url.clone();
                     }
                     if link.clicked() {
-                        let port = if line.port != 70 {
-                            format!(":{}", line.port)
-                        } else {
-                            "".to_string()
-                        };
-                        let scheme = breeze.current_url.scheme();
-                        let mut url =
-                            format!("{}://{}{}{}", scheme, line.hostname, port, line.selector);
                         if line.user_display_string.contains("://") {
                             url = line.user_display_string.clone();
                         }

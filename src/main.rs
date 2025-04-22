@@ -12,9 +12,9 @@ use std::sync::Arc;
 
 use clap::Parser;
 use eframe::egui::{
-    include_image, menu, Align, Button, CentralPanel, Context, CursorIcon, FontData,
-    FontDefinitions, FontFamily, IconData, Image, Key, Label, Layout, Modal, PointerButton,
-    RichText, ScrollArea, Separator, TextEdit, TopBottomPanel, ViewportBuilder, ViewportId, Ui, TextStyle,
+    include_image, menu, vec2, Align, Button, CentralPanel, Context, CursorIcon, FontData,
+    FontDefinitions, FontFamily, Frame, IconData, Image, Key, Label, Layout, Modal, PointerButton,
+    RichText, ScrollArea, Separator, TextEdit, TopBottomPanel, Ui, ViewportBuilder, ViewportId,
 };
 use poll_promise::Promise;
 use url::Url;
@@ -46,7 +46,7 @@ fn main() -> eframe::Result {
         .expect("Failed to open icon path")
         .to_rgba8();
     let viewport = ViewportBuilder::default()
-        .with_inner_size([640.0, 480.0])
+        .with_inner_size([800.0, 600.0])
         .with_icon(IconData {
             rgba: image.into_raw(),
             width: 32,
@@ -250,7 +250,7 @@ impl Breeze {
                     "0"
                 };
                 (format!("{} {} {}", hostname, path, query), false)
-            },
+            }
             Protocol::TextProtocol => (current_url, false),
             _ => unreachable!(),
         };
@@ -468,18 +468,20 @@ fn render_browser(ui: &mut eframe::egui::Ui, ctx: &Context, breeze: &mut Breeze)
         breeze.reset_scroll_pos = false;
     }
     scroll_area.show(ui, |ui| {
-        // TODO: This should eventually check content type instead of protocol
-        let protocol = Protocol::from_url(&breeze.current_url);
-        match protocol {
-            Protocol::Finger => breeze.content_handlers.finger.render_page(ui, breeze),
-            Protocol::Gemini | Protocol::Spartan | Protocol::Guppy | Protocol::Scroll => {
-                breeze.content_handlers.gemtext.render_page(ui, breeze);
+        Frame::new().inner_margin(vec2(64.0, 16.0)).show(ui, |ui| {
+            // TODO: This should eventually check content type instead of protocol
+            let protocol = Protocol::from_url(&breeze.current_url);
+            match protocol {
+                Protocol::Finger => breeze.content_handlers.finger.render_page(ui, breeze),
+                Protocol::Gemini | Protocol::Spartan | Protocol::Guppy | Protocol::Scroll => {
+                    breeze.content_handlers.gemtext.render_page(ui, breeze);
+                }
+                Protocol::Gopher(_) => breeze.content_handlers.gopher.render_page(ui, breeze),
+                Protocol::Nex => breeze.content_handlers.nex.render_page(ui, breeze),
+                Protocol::Scorpion => breeze.content_handlers.scorpion.render_page(ui, breeze),
+                _ => breeze.content_handlers.plaintext.render_page(ui, breeze),
             }
-            Protocol::Gopher(_) => breeze.content_handlers.gopher.render_page(ui, breeze),
-            Protocol::Nex => breeze.content_handlers.nex.render_page(ui, breeze),
-            Protocol::Scorpion => breeze.content_handlers.scorpion.render_page(ui, breeze),
-            _ => breeze.content_handlers.plaintext.render_page(ui, breeze),
-        }
+        })
     });
 
     if let Some(input_request) = &mut breeze.input_request {
