@@ -379,11 +379,19 @@ impl eframe::App for Breeze {
                     ServerStatus::Gemini(GeminiStatus::TemporaryRedirect(url))
                     | ServerStatus::Gemini(GeminiStatus::PermanentRedirect(url))
                     | ServerStatus::Spartan(SpartanStatus::Redirect(url))
-                    | ServerStatus::TextProtocol(TextProtocolStatus::Redirect(url)) => {
+                    | ServerStatus::TextProtocol(TextProtocolStatus::Redirect(url))
+                    | ServerStatus::Scorpion(ScorpionStatus::TemporaryRedirect(url))
+                    | ServerStatus::Scorpion(ScorpionStatus::PermanentRedirect(url)) => {
                         println!("Redirecting to: {}", url);
-                        self.url.set(url.clone());
+                        let mut current_url = self.current_url.clone();
+                        if url.starts_with("/") {
+                            current_url.set_path(&url);
+                        } else {
+                            current_url.join(&url).unwrap();
+                        }
+                        self.url.set(current_url.to_string());
                         self.navigation_hint.set(Some(NavigationHint {
-                            url: url.clone(),
+                            url: current_url.to_string(),
                             protocol: job.protocol,
                             add_to_history: true,
                         }));
