@@ -2,7 +2,7 @@
 # Breeze - A SmolNet Browser
 
 <p align="center">
-  <img src="res/breeze.png">
+  <img src="res/breeze512.png">
 </p>
 Breeze is a Rust-based browser for various "SmolNet" protocols like Gopher, Gemini, Spartan, Guppy, Nex, and more.
 
