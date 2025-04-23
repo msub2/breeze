@@ -319,8 +319,8 @@ impl eframe::App for Breeze {
                     CentralPanel::default().show(ctx, |ui| {
                         ui.vertical_centered(|ui| {
                             ui.add(
-                                Image::new(include_image!("../res/breeze.png"))
-                                    .max_size([200.0, 200.0].into()),
+                                Image::new(include_image!("../res/breeze512.png"))
+                                    .max_size([256.0, 256.0].into()),
                             );
                             ui.add(Label::new(RichText::new("Breeze").size(24.0)));
                             ui.label("Version: 0.0.1-alpha");
