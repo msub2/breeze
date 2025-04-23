@@ -235,7 +235,7 @@ impl Breeze {
         };
         let plaintext = protocol_hint.is_some_and(|p| p == Protocol::Plaintext)
             || current_url.ends_with(".txt");
-        let (selector, ssl) = match protocol {
+        let (request_body, ssl) = match protocol {
             Protocol::Finger => (path.strip_prefix("/").unwrap_or(&path).to_string(), false),
             Protocol::Gemini => (current_url, true),
             Protocol::Gopher(ssl) => (format!("{}{}", path, query), ssl),
@@ -256,7 +256,7 @@ impl Breeze {
         };
         let url = self.current_url.clone();
         let promise =
-            Promise::spawn_thread("net", move || fetch(&url, selector.as_str(), ssl, protocol));
+            Promise::spawn_thread("net", move || fetch(&url, &request_body, ssl, protocol));
         self.nav_job
             .replace(NavigationJob::new(promise, plaintext, protocol));
     }

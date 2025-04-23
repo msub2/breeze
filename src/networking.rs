@@ -215,7 +215,7 @@ pub struct ServerResponse {
 
 pub fn fetch(
     url: &Url,
-    selector: &str,
+    request_body: &str,
     ssl: bool,
     protocol: Protocol,
 ) -> Result<ServerResponse, String> {
@@ -233,11 +233,11 @@ pub fn fetch(
         _ => 0,
     });
     let url = format!("{}:{}", hostname, port);
-    let request = format!("{}\r\n", selector);
+    let request = format!("{}\r\n", request_body);
     let mut buf = Vec::new();
 
     if protocol == Protocol::Guppy {
-        return fetch_udp(hostname, port, selector, ssl);
+        return fetch_udp(hostname, port, request_body, ssl);
     }
 
     if ssl {
