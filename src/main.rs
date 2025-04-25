@@ -1,8 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+mod db;
 mod handlers;
 mod history;
 mod networking;
+mod profile;
 
 use std::cell::{Cell, RefCell};
 use std::process::exit;
@@ -11,6 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use clap::Parser;
+use db::{get_all_profiles, set_active_profile};
 use eframe::egui::{
     include_image, menu, vec2, Align, Button, CentralPanel, Context, CursorIcon, FontData,
     FontDefinitions, FontFamily, Frame, IconData, Image, Key, Label, Layout, Modal, PointerButton,
@@ -31,6 +34,7 @@ use crate::networking::{
     fetch, GeminiStatus, ScorpionStatus, ServerResponse, ServerStatus, SpartanStatus,
     TextProtocolStatus,
 };
+use crate::profile::Profile;
 
 #[derive(Parser)]
 struct Args {
@@ -159,6 +163,7 @@ struct InputRequest {
     pub sensitive: bool,
     pub destination: String,
     pub user_input: String,
+    pub completed: bool,
 }
 
 enum ActiveView {
@@ -183,11 +188,14 @@ struct Breeze {
     show_about_window: Arc<AtomicBool>,
     status_text: RefCell<String>,
     active_view: ActiveView,
+    profiles: Vec<Profile>,
+    should_update_profiles: bool,
 }
 
 impl Breeze {
     fn new(starting_url: String) -> Self {
         let starting_url = Url::from_str(&starting_url).unwrap();
+        let profiles = get_all_profiles().unwrap();
         Self {
             url: Cell::new(starting_url.to_string()),
             current_url: starting_url.clone(),
@@ -204,12 +212,13 @@ impl Breeze {
             show_about_window: Arc::new(AtomicBool::new(false)),
             status_text: RefCell::new("".to_string()),
             active_view: ActiveView::Browser,
+            profiles,
+            should_update_profiles: false,
         }
     }
 
     // Validate URL before updating the currently active page content
     fn navigate(&mut self, protocol_hint: Option<Protocol>, should_add_entry: bool) {
-        self.input_request = None;
         if should_add_entry {
             println!("{}", self.url.get_mut());
             let protocol = protocol_hint.unwrap_or(Protocol::from_url(&self.current_url));
@@ -272,11 +281,37 @@ impl eframe::App for Breeze {
                         exit(0);
                     }
                 });
+                ui.menu_button("Profile", |ui| {
+                    if ui.button("New").clicked() {
+                        self.input_request = Some(InputRequest {
+                            prompt: "Enter the name you would like to use for this profile"
+                                .to_string(),
+                            sensitive: false,
+                            destination: "breeze://profile/new".to_string(),
+                            user_input: String::new(),
+                            completed: false,
+                        })
+                    }
+                    ui.separator();
+                    for profile in &self.profiles {
+                        ui.horizontal(|ui| {
+                            if profile.active {
+                                ui.label("✓");
+                            }
+
+                            let button = Button::new(&profile.name).min_size([128.0, 20.0].into());
+                            if ui.add(button).clicked() {
+                                let _ = set_active_profile(profile.name.clone());
+                                self.should_update_profiles = true;
+                            }
+                        });
+                    }
+                });
                 ui.menu_button("Help", |ui| {
                     if ui.button("About Breeze").clicked() {
                         self.show_about_window.store(true, Ordering::Relaxed);
                     }
-                })
+                });
             });
         });
         TopBottomPanel::bottom("statusbar").show(ctx, |ui| {
@@ -340,6 +375,15 @@ impl eframe::App for Breeze {
             self.reset_scroll_pos = true;
         }
 
+        if self.input_request.as_ref().is_some_and(|r| r.completed) {
+            self.input_request = None;
+        }
+
+        if self.should_update_profiles {
+            self.should_update_profiles = false;
+            self.profiles = get_all_profiles().unwrap();
+        }
+
         let Some(job) = &self.nav_job else { return };
         match job.nav_promise.ready() {
             Some(Ok(response)) => {
@@ -355,6 +399,7 @@ impl eframe::App for Breeze {
                             sensitive: *sensitive,
                             destination: self.current_url.to_string(),
                             user_input: "".to_string(),
+                            completed: false,
                         });
                     }
                     // Success
@@ -414,6 +459,24 @@ impl eframe::App for Breeze {
                     | ServerStatus::Spartan(SpartanStatus::ServerError(data))
                     | ServerStatus::TextProtocol(TextProtocolStatus::NOK(data)) => {
                         let msg = format!("The requested resource could not be found.\n\nAdditional information:\n\n{}", data);
+                        self.content_handlers
+                            .parse_content(msg.as_bytes(), true, job.protocol);
+                    }
+                    // Certificates
+                    ServerStatus::Gemini(GeminiStatus::RequiresClientCertificate) => {
+                        let msg = format!("The requested resource requires a client certificate. You can create one by clicking \"New\" in the Profiles tab.");
+                        self.content_handlers
+                            .parse_content(msg.as_bytes(), true, job.protocol);
+                    }
+                    ServerStatus::Gemini(GeminiStatus::CertificateNotAuthorized) => {
+                        let msg = format!(
+                            "Your client certificate is not authorized to access this resource"
+                        );
+                        self.content_handlers
+                            .parse_content(msg.as_bytes(), true, job.protocol);
+                    }
+                    ServerStatus::Gemini(GeminiStatus::CertificateNotValid) => {
+                        let msg = format!("The requested resource is unavailable as your client certificate is invalid. Check to see if your certificate has expired.");
                         self.content_handlers
                             .parse_content(msg.as_bytes(), true, job.protocol);
                     }
@@ -499,12 +562,22 @@ fn render_browser(ui: &mut eframe::egui::Ui, ctx: &Context, breeze: &mut Breeze)
                 .password(input_request.sensitive);
             ui.add(text_edit);
             if ui.button("Submit").clicked() {
-                let url = format!("{}?{}", input_request.destination, input_request.user_input);
-                breeze.navigation_hint.set(Some(NavigationHint {
-                    url,
-                    protocol: Protocol::from_str(&input_request.destination),
-                    add_to_history: true,
-                }));
+                if input_request.destination == "breeze://profile/new" {
+                    let profile = Profile::new(input_request.user_input.clone());
+                    let currently_active = breeze.profiles.iter_mut().find(|p| p.active);
+                    if let Some(currently_active) = currently_active {
+                        currently_active.active = false;
+                    }
+                    breeze.profiles.push(profile);
+                } else {
+                    let url = format!("{}?{}", input_request.destination, input_request.user_input);
+                    breeze.navigation_hint.set(Some(NavigationHint {
+                        url,
+                        protocol: Protocol::from_str(&input_request.destination),
+                        add_to_history: true,
+                    }));
+                }
+                input_request.completed = true;
             }
         });
     }

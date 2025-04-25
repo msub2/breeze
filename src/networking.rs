@@ -7,6 +7,7 @@ use eframe::egui::TextBuffer;
 use native_tls::TlsConnector;
 use url::Url;
 
+use crate::db::get_default_profile;
 use crate::handlers::Protocol;
 
 #[allow(dead_code)]
@@ -63,7 +64,10 @@ impl From<&str> for GeminiStatus {
         match code {
             "10" => GeminiStatus::InputExpected(data, false),
             "11" => GeminiStatus::InputExpected(data, true),
-            "20" => GeminiStatus::Success(data),
+            // Most of these extra ones are for scroll
+            "20" | "21" | "22" | "23" | "24" | "25" | "26" | "27" | "28" | "29" => {
+                GeminiStatus::Success(data)
+            }
             "30" => GeminiStatus::TemporaryRedirect(data),
             "31" => GeminiStatus::PermanentRedirect(data),
             "40" => GeminiStatus::TemporaryFailure(data),
@@ -241,10 +245,16 @@ pub fn fetch(
     }
 
     if ssl {
-        let connector = TlsConnector::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+        let identity = match get_default_profile() {
+            Ok(p) => Some(p.identity),
+            Err(_) => None,
+        };
+        let mut connector_builder = TlsConnector::builder();
+        connector_builder.danger_accept_invalid_certs(true);
+        if let Some(identity) = identity {
+            connector_builder.identity(identity);
+        }
+        let connector = connector_builder.build().unwrap();
 
         let stream =
             TcpStream::connect(format!("{}:{}", hostname, port)).map_err(|e| e.to_string())?;
@@ -321,7 +331,7 @@ fn fetch_udp(
 
 fn parse_server_response(response: &[u8], protocol: Protocol) -> ServerResponse {
     match protocol {
-        Protocol::Gemini => {
+        Protocol::Gemini | Protocol::Scroll => {
             let response = String::from_utf8_lossy(response);
             let (server_status, content) = response.split_once('\n').unwrap();
             ServerResponse {
