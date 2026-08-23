@@ -42,9 +42,6 @@ Below are the following protocols that Breeze should ideally be able to speak. "
 - Text Protocol
   - [x] Usable
   - [ ] Navigable
-- SuperTXT
-  - [ ] Usable
-  - [ ] Navigable
 - Nightfall Express
   - [x] Usable
   - [x] Navigable
