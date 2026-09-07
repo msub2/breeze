@@ -9,15 +9,15 @@ mod profile;
 use std::cell::{Cell, RefCell};
 use std::process::exit;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use clap::Parser;
 use db::{get_all_profiles, set_active_profile};
 use eframe::egui::{
-    include_image, menu, vec2, Align, Button, CentralPanel, Context, CursorIcon, FontData,
-    FontDefinitions, FontFamily, Frame, IconData, Image, Key, Label, Layout, Modal, PointerButton,
-    RichText, ScrollArea, Separator, TextEdit, TopBottomPanel, Ui, ViewportBuilder, ViewportId,
+    Align, Button, CentralPanel, CursorIcon, FontData, FontDefinitions, FontFamily, Frame,
+    IconData, Image, Key, Label, Layout, MenuBar, Modal, Panel, PointerButton, RichText,
+    ScrollArea, Separator, TextEdit, Ui, ViewportBuilder, ViewportId, include_image, vec2,
 };
 use poll_promise::Promise;
 use url::Url;
@@ -31,8 +31,8 @@ use crate::handlers::scorpion::Scorpion;
 use crate::handlers::{Protocol, ProtocolHandler};
 use crate::history::{add_entry, can_go_back, can_go_forward};
 use crate::networking::{
-    fetch, GeminiStatus, ScorpionStatus, ServerResponse, ServerStatus, SpartanStatus,
-    TextProtocolStatus,
+    GeminiStatus, ScorpionStatus, ServerResponse, ServerStatus, SpartanStatus, TextProtocolStatus,
+    fetch,
 };
 use crate::profile::Profile;
 
@@ -272,10 +272,10 @@ impl Breeze {
 }
 
 impl eframe::App for Breeze {
-    fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        ctx.request_repaint();
-        TopBottomPanel::top("menubar").show(ctx, |ui| {
-            menu::bar(ui, |ui| {
+    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+        //ctx.request_repaint();
+        Panel::top("menubar").show(ui, |ui| {
+            MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("Quit").clicked() {
                         exit(0);
@@ -314,7 +314,7 @@ impl eframe::App for Breeze {
                 });
             });
         });
-        TopBottomPanel::bottom("statusbar").show(ctx, |ui| {
+        Panel::bottom("statusbar").show(ui, |ui| {
             ui.horizontal(|ui| {
                 if ui.button("Browser").clicked() {
                     self.active_view = ActiveView::Browser;
@@ -336,16 +336,16 @@ impl eframe::App for Breeze {
             });
         });
         self.status_text.borrow_mut().clear();
-        CentralPanel::default().show(ctx, |ui| match self.active_view {
-            ActiveView::Browser => render_browser(ui, ctx, self),
-            ActiveView::Mail => render_mail(ui, ctx, self),
-            ActiveView::Chat => render_chat(ui, ctx, self),
-            ActiveView::Composer => render_composer(ui, ctx, self),
+        CentralPanel::default().show(ui, |ui| match self.active_view {
+            ActiveView::Browser => render_browser(ui, self),
+            ActiveView::Mail => render_mail(ui, self),
+            ActiveView::Chat => render_chat(ui, self),
+            ActiveView::Composer => render_composer(ui, self),
         });
 
         if self.show_about_window.load(Ordering::Relaxed) {
             let show_about_window = self.show_about_window.clone();
-            ctx.show_viewport_deferred(
+            ui.show_viewport_deferred(
                 ViewportId::from_hash_of("about"),
                 ViewportBuilder::default()
                     .with_title("About")
@@ -458,13 +458,18 @@ impl eframe::App for Breeze {
                     | ServerStatus::Spartan(SpartanStatus::ClientError(data))
                     | ServerStatus::Spartan(SpartanStatus::ServerError(data))
                     | ServerStatus::TextProtocol(TextProtocolStatus::NOK(data)) => {
-                        let msg = format!("The requested resource could not be found.\n\nAdditional information:\n\n{}", data);
+                        let msg = format!(
+                            "The requested resource could not be found.\n\nAdditional information:\n\n{}",
+                            data
+                        );
                         self.content_handlers
                             .parse_content(msg.as_bytes(), true, job.protocol);
                     }
                     // Certificates
                     ServerStatus::Gemini(GeminiStatus::RequiresClientCertificate) => {
-                        let msg = format!("The requested resource requires a client certificate. You can create one by clicking \"New\" in the Profiles tab.");
+                        let msg = format!(
+                            "The requested resource requires a client certificate. You can create one by clicking \"New\" in the Profiles tab."
+                        );
                         self.content_handlers
                             .parse_content(msg.as_bytes(), true, job.protocol);
                     }
@@ -476,7 +481,9 @@ impl eframe::App for Breeze {
                             .parse_content(msg.as_bytes(), true, job.protocol);
                     }
                     ServerStatus::Gemini(GeminiStatus::CertificateNotValid) => {
-                        let msg = format!("The requested resource is unavailable as your client certificate is invalid. Check to see if your certificate has expired.");
+                        let msg = format!(
+                            "The requested resource is unavailable as your client certificate is invalid. Check to see if your certificate has expired."
+                        );
                         self.content_handlers
                             .parse_content(msg.as_bytes(), true, job.protocol);
                     }
@@ -491,12 +498,12 @@ impl eframe::App for Breeze {
                     .parse_content(error.as_bytes(), true, job.protocol);
                 self.nav_job = None;
             }
-            None => ctx.set_cursor_icon(CursorIcon::Wait),
+            None => ui.set_cursor_icon(CursorIcon::Wait),
         }
     }
 }
 
-fn render_browser(ui: &mut eframe::egui::Ui, ctx: &Context, breeze: &mut Breeze) {
+fn render_browser(ui: &mut eframe::egui::Ui, breeze: &mut Breeze) {
     // Navigation and address bar
     ui.horizontal(|ui| {
         if ui.add_enabled(can_go_back(), Button::new("←")).clicked()
@@ -556,7 +563,7 @@ fn render_browser(ui: &mut eframe::egui::Ui, ctx: &Context, breeze: &mut Breeze)
     });
 
     if let Some(input_request) = &mut breeze.input_request {
-        Modal::new("input".into()).show(ctx, |ui| {
+        Modal::new("input".into()).show(ui, |ui| {
             ui.label(input_request.prompt.as_str());
             let text_edit = TextEdit::singleline(&mut input_request.user_input)
                 .password(input_request.sensitive);
@@ -583,14 +590,14 @@ fn render_browser(ui: &mut eframe::egui::Ui, ctx: &Context, breeze: &mut Breeze)
     }
 }
 
-fn render_mail(ui: &mut Ui, _ctx: &Context, _breeze: &mut Breeze) {
+fn render_mail(ui: &mut Ui, _breeze: &mut Breeze) {
     ui.label("This is a placeholder for the mail tab, which will act as a client for Misfin and the NPS.");
 }
 
-fn render_chat(ui: &mut Ui, _ctx: &Context, _breeze: &mut Breeze) {
+fn render_chat(ui: &mut Ui, _breeze: &mut Breeze) {
     ui.label("This is a placeholder for the chat tab, which will feature a built-in IRC client.");
 }
 
-fn render_composer(ui: &mut Ui, _ctx: &Context, _breeze: &mut Breeze) {
+fn render_composer(ui: &mut Ui, _breeze: &mut Breeze) {
     ui.label("This is a placeholder for the composer tab, which will allow users to compose Gemtext, Gophermaps, and so on.");
 }

@@ -1,8 +1,8 @@
 use native_tls::Identity;
 use rcgen::{CertificateParams, DistinguishedName, DnType};
+use rsa::RsaPrivateKey;
 use rsa::pkcs8::EncodePrivateKey;
 use rsa::rand_core::OsRng;
-use rsa::RsaPrivateKey;
 
 use crate::db::new_profile;
 

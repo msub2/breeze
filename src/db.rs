@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use native_tls::Identity;
-use rusqlite::{params, Connection, Error, Result};
+use rusqlite::{Connection, Error, Result, params};
 
 use crate::profile::Profile;
 
