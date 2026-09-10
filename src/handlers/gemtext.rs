@@ -140,97 +140,95 @@ impl ProtocolHandler for Gemtext {
     fn render_page(&self, ui: &mut Ui, breeze: &Breeze) {
         ui.style_mut().spacing.item_spacing = Vec2::new(0.0, -1.0);
         for line in &self.current_page_contents {
-            ui.horizontal(|ui| {
-                if line.preformatted && line.line_type != LineType::PreformatToggle {
-                    let mut padded_text = line.content.clone();
-                    let padding_needed = 120_usize.saturating_sub(padded_text.len());
-                    padded_text.push_str(&" ".repeat(padding_needed));
-                    let text = RichText::new(&padded_text).code().size(14.0);
-                    ui.add_sized([120.0, 16.0], egui::Label::new(text).extend());
-                } else {
-                    match line.line_type {
-                        LineType::Text => {
-                            let text = RichText::new(&line.content).size(14.0);
-                            let label = egui::Label::new(text).wrap_mode(egui::TextWrapMode::Wrap);
-                            ui.add(label);
-                        }
-                        LineType::Heading1 => {
-                            let content = line.content.replace("# ", "");
-                            ui.label(RichText::new(&content).size(24.0));
-                        }
-                        LineType::Heading2 => {
-                            let content = line.content.replace("## ", "");
-                            ui.label(RichText::new(&content).size(22.0));
-                        }
-                        LineType::Heading3 => {
-                            let content = line.content.replace("### ", "");
-                            ui.label(RichText::new(&content).size(20.0));
-                        }
-                        LineType::Link => {
-                            let link_text = RichText::new(&line.content)
-                                .color(Color32::BLUE)
-                                .underline()
-                                .size(14.0);
-                            let path = line.path.clone().expect("Gemtext link line without path!");
-                            let current_url = breeze.current_url.clone();
-                            let current_url = current_url.join(&path).unwrap();
+            if line.preformatted && line.line_type != LineType::PreformatToggle {
+                let mut padded_text = line.content.clone();
+                let padding_needed = 120_usize.saturating_sub(padded_text.len());
+                padded_text.push_str(&" ".repeat(padding_needed));
+                let text = RichText::new(&padded_text).code().size(14.0);
+                ui.add_sized([120.0, 16.0], egui::Label::new(text).extend());
+            } else {
+                match line.line_type {
+                    LineType::Text => {
+                        let text = RichText::new(&line.content).size(14.0);
+                        let label = egui::Label::new(text).wrap_mode(egui::TextWrapMode::Wrap);
+                        ui.add(label);
+                    }
+                    LineType::Heading1 => {
+                        let content = line.content.replace("# ", "");
+                        ui.label(RichText::new(&content).size(24.0));
+                    }
+                    LineType::Heading2 => {
+                        let content = line.content.replace("## ", "");
+                        ui.label(RichText::new(&content).size(22.0));
+                    }
+                    LineType::Heading3 => {
+                        let content = line.content.replace("### ", "");
+                        ui.label(RichText::new(&content).size(20.0));
+                    }
+                    LineType::Link => {
+                        let link_text = RichText::new(&line.content)
+                            .color(Color32::BLUE)
+                            .underline()
+                            .size(14.0);
+                        let path = line.path.clone().expect("Gemtext link line without path!");
+                        let current_url = breeze.current_url.clone();
+                        let current_url = current_url.join(&path).unwrap();
 
-                            let link = ui.add(Label::new(link_text).sense(egui::Sense::hover()));
-                            if link.hovered() {
-                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                                *breeze.status_text.borrow_mut() = current_url.to_string();
-                            }
-                            if link.clicked() {
-                                breeze.url.set(current_url.to_string());
-                                let hint = if path.ends_with(".txt") {
-                                    Protocol::Plaintext
-                                } else {
-                                    Protocol::from_url(&current_url)
-                                };
-                                breeze.navigation_hint.set(Some(NavigationHint {
-                                    url: current_url.to_string(),
-                                    protocol: hint,
-                                    add_to_history: true,
-                                }));
-                            }
+                        let link = ui.add(Label::new(link_text).sense(egui::Sense::hover()));
+                        if link.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                            *breeze.status_text.borrow_mut() = current_url.to_string();
                         }
-                        LineType::Quote => {
-                            ui.horizontal(|ui| {
-                                ui.label(RichText::new("| ").size(14.0));
-                                ui.label(RichText::new(&line.content).italics().size(14.0))
-                            });
+                        if link.clicked() {
+                            breeze.url.set(current_url.to_string());
+                            let hint = if path.ends_with(".txt") {
+                                Protocol::Plaintext
+                            } else {
+                                Protocol::from_url(&current_url)
+                            };
+                            breeze.navigation_hint.set(Some(NavigationHint {
+                                url: current_url.to_string(),
+                                protocol: hint,
+                                add_to_history: true,
+                            }));
                         }
-                        LineType::List => {
-                            let content = line.content.replace("*", "•");
-                            ui.label(RichText::new(content).size(14.0));
-                        }
-                        LineType::PreformatToggle => {}
-                        LineType::Prompt => {
-                            let mut current_prompt = line.prompt_string.take();
-                            ui.add(TextEdit::singleline(&mut current_prompt));
-                            line.prompt_string.replace(current_prompt.clone());
-                            if ui.button("Submit").clicked() {
-                                let path =
-                                    line.path.clone().expect("Gemtext link line without path!");
-                                let current_url = breeze.current_url.clone();
-                                let mut current_url = current_url.join(&path).unwrap();
-                                current_url.set_query(Some(&current_prompt));
-                                breeze.url.set(current_url.to_string());
-                                let hint = if path.ends_with(".txt") {
-                                    Protocol::Plaintext
-                                } else {
-                                    Protocol::from_url(&current_url)
-                                };
-                                breeze.navigation_hint.set(Some(NavigationHint {
-                                    url: current_url.to_string(),
-                                    protocol: hint,
-                                    add_to_history: true,
-                                }));
-                            }
+                    }
+                    LineType::Quote => {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("| ").size(14.0));
+                            ui.label(RichText::new(&line.content).italics().size(14.0))
+                        });
+                    }
+                    LineType::List => {
+                        let content = line.content.replace("*", "•");
+                        ui.label(RichText::new(content).size(14.0));
+                    }
+                    LineType::PreformatToggle => {}
+                    LineType::Prompt => {
+                        let mut current_prompt = line.prompt_string.take();
+                        ui.add(TextEdit::singleline(&mut current_prompt));
+                        line.prompt_string.replace(current_prompt.clone());
+                        if ui.button("Submit").clicked() {
+                            let path =
+                                line.path.clone().expect("Gemtext link line without path!");
+                            let current_url = breeze.current_url.clone();
+                            let mut current_url = current_url.join(&path).unwrap();
+                            current_url.set_query(Some(&current_prompt));
+                            breeze.url.set(current_url.to_string());
+                            let hint = if path.ends_with(".txt") {
+                                Protocol::Plaintext
+                            } else {
+                                Protocol::from_url(&current_url)
+                            };
+                            breeze.navigation_hint.set(Some(NavigationHint {
+                                url: current_url.to_string(),
+                                protocol: hint,
+                                add_to_history: true,
+                            }));
                         }
                     }
                 }
-            });
+            }
         }
     }
 }
