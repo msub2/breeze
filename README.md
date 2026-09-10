@@ -12,7 +12,6 @@ Below are the following protocols that Breeze should ideally be able to speak. "
 
 - Finger
   - [x] Usable
-  - [ ] Navigable
 - Gopher
   - [x] Usable
   - [x] Navigable
